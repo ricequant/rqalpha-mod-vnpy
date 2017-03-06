@@ -33,22 +33,34 @@ def _order_book_id(symbol):
 
 class RQVNInstrument(Instrument):
     def __init__(self, vnpy_contract):
-        # TODO: 扩展 vnpy 中 contract 字段，支持更多数据
         # TODO：从 rqalpha data bundle 中读取数据，补充字段
+        listed_date = vnpy_contract.get('openDate')
+        de_listed_date = vnpy_contract.get('expireDate')
+
+        if listed_date is not None:
+            listed_date = '%s-%s-%s' % (listed_date[:4], listed_date[4:6], listed_date[6:])
+        else:
+            listed_date = '0000-00-00'
+
+        if de_listed_date is not None:
+            de_listed_date = '%s-%s-%s' % (de_listed_date[:4], de_listed_date[4:6], de_listed_date[6:])
+        else:
+            de_listed_date = '0000-00-00'
+
         dic = {
-            'order_book_id': _order_book_id(vnpy_contract.symbol),
-            'exchange': vnpy_contract.exchange,
-            'symbol': vnpy_contract.name,
-            'contract_multiplier': vnpy_contract.size,
-            'trading_unit': vnpy_contract.priceTick,
-            'type': 'Future'
-            'margin_rate':
+            'order_book_id': _order_book_id(vnpy_contract.get('symbol')),
+            'exchange': vnpy_contract.get('exchange'),
+            'symbol': vnpy_contract.get('name'),
+            'contract_multiplier': vnpy_contract.get('size'),
+            'trading_unit': vnpy_contract.get('priceTick'),
+            'type': 'Future',
+            'margin_rate': vnpy_contract.get('longMarginRatio'),
+            'listed_date': listed_date,
+            'de_listed_date': de_listed_date,
+            'maturity_date': de_listed_date,
         }
 
         super(RQVNInstrument, self).__init__(dic)
-
-    @property
-
 
 
 class RQVNOrder(Order):

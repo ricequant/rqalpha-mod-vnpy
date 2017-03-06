@@ -19,7 +19,7 @@ from .vn_trader.vtConstant import STATUS_NOTTRADED, STATUS_PARTTRADED, STATUS_AL
 from .vn_trader.vtConstant import CURRENCY_CNY
 from .vn_trader.vtConstant import PRODUCT_FUTURES
 
-from .vnpy_gateway import EVENT_POSITION_EXTRA
+from .vnpy_gateway import EVENT_POSITION_EXTRA, EVENT_CONTRACT_EXTRA
 from .data_factory import RQVNOrder, RQVNTrade, RQVNCount
 from .utils import SIDE_MAPPING, ORDER_TYPE_MAPPING, POSITION_EFFECT_MAPPING
 
@@ -164,20 +164,18 @@ class RQVNPYEngine(object):
         contract = event.dict_['data']
         system_log.debug("on_contract {}", contract.__dict__)
         self._data_cache.put_contract(contract)
+        self._data_cache.put_contract_or_extra(contract)
 
-    def wait_until_contract_updated(self, timeout=None):
-        start_time = time()
-        while True:
-            if self.vnpy_gateway.contract_update_complete:
-                break
-            else:
-                if timeout is not None:
-                    if time() - start_time > timeout:
-                        break
+    def on_contract_extra(self, event):
+        contract_extra = event.dict_['data']
+        system_log.debug("on_contract_extra {}", contract_extra.__dict__)
+        self._data_cache.put_contract_or_extra(contract_extra)
+
+    def get_all_contract_dict(self):
+        return self._data_cache.get_all_contract_dict()
 
     # ------------------------------------ tick生命周期 ------------------------------------
     def on_universe_changed(self, universe):
-        self.wait_until_contract_updated(timeout=10)
         for order_book_id in universe:
             self.subscribe(order_book_id)
 
@@ -291,14 +289,15 @@ class RQVNPYEngine(object):
             try:
                 from .vnpy_gateway import RQVNCTPGateway
                 self.vnpy_gateway = RQVNCTPGateway(self.event_engine, self.gateway_type)
-                # self.vnpy_gateway.setQryEnabled(True)
             except ImportError as e:
                 system_log.exception("No Gateway named CTP")
         else:
             system_log.error('No Gateway named {}', self.gateway_type)
 
+    def connect(self):
+        self.vnpy_gateway.connect(dict(getattr(self._config, self.gateway_type)))
+
     def do_init(self):
-        self.vnpy_gateway.do_init(dict(getattr(self._config, self.gateway_type)))
         for account in self.accounts.values():
             if account.inited:
                 continue
@@ -317,18 +316,9 @@ class RQVNPYEngine(object):
         self.event_engine.register(EVENT_ACCOUNT, self.on_account)
         self.event_engine.register(EVENT_POSITION, self.on_positions)
         self.event_engine.register(EVENT_POSITION_EXTRA, self.on_position_extra)
+        self.event_engine.register(EVENT_CONTRACT_EXTRA, self.on_contract_extra)
 
         self._env.event_bus.add_listener(EVENT.POST_UNIVERSE_CHANGED, self.on_universe_changed)
-
-    def wait_until_inited(self, timeout=None):
-        start_time = time()
-        while True:
-            if self.vnpy_gateway.inited:
-                break
-            else:
-                if timeout is not None:
-                    if time() - start_time > timeout:
-                        break
 
     # ------------------------------------ 其他 ------------------------------------
     def on_log(self, event):
@@ -348,6 +338,7 @@ class DataCache(object):
         self._open_order_dict = {}
 
         self._contract_dict = {}
+        self._contract_cache = {}
 
         self._tick_snapshot_dict = {}
 
@@ -374,9 +365,16 @@ class DataCache(object):
     def put_vnpy_order(self, order_id, vnpy_order):
         self._vnpy_order_dict[order_id] = vnpy_order
 
-    def put_contract(self, contract):
-        order_book_id = self._order_book_id(contract.symbol)
-        self._contract_dict[order_book_id] = contract
+    def put_contract(self, vnpy_contract):
+        order_book_id = self._order_book_id(vnpy_contract.symbol)
+        self._contract_dict[order_book_id] = vnpy_contract
+
+    def put_contract_or_extra(self, contract_or_extra):
+        symbol = contract_or_extra.symbol
+        if symbol not in self._contract_cache:
+            self._contract_cache[symbol] = contract_or_extra.__dict__
+        else:
+            self._contract_cache[symbol].update(contract_or_extra.__dict__)
 
     def del_open_order(self, vnpy_order_id):
         if vnpy_order_id in self._open_order_dict:
@@ -413,3 +411,6 @@ class DataCache(object):
 
     def get_contract_dict(self):
         return self._contract_dict
+
+    def get_all_contract_dict(self):
+        return self._contract_cache

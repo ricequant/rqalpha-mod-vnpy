@@ -9,6 +9,7 @@ from .vn_trader.vtConstant import EMPTY_FLOAT, EMPTY_INT, EMPTY_STRING, EMPTY_UN
 from .vn_trader.eventEngine import Event
 
 EVENT_POSITION_EXTRA = 'ePositionExtra'
+EVENT_CONTRACT_EXTRA = 'eContractExtra'
 
 
 # ------------------------------------ 自定义或扩展数据类型 ------------------------------------
@@ -22,16 +23,22 @@ class PositionExtra(VtBaseData):
         self.openCost = EMPTY_FLOAT
 
 
+class ContractExtra(VtBaseData):
+    def __init__(self):
+        super(ContractExtra, self).__init__()
+
+        self.symbol = EMPTY_STRING
+
+        self.openDate = EMPTY_STRING
+        self.expireDate = EMPTY_STRING
+        self.longMarginRatio = EMPTY_FLOAT
+
+
 # ------------------------------------ 扩展CTPApi ------------------------------------
 class RQCTPTdApi(CtpTdApi):
     def __init__(self, gateway):
         super(RQCTPTdApi, self).__init__(gateway)
         self.posExtraDict = {}
-
-    def onRspQryInstrument(self, data, error, n, last):
-        super(RQCTPTdApi, self).onRspQryInstrument(data, error, n, last)
-        if last:
-            self.gateway.status.contract_success()
 
     def onRspQryTradingAccount(self, data, error, n, last):
         super(RQCTPTdApi, self).onRspQryTradingAccount(data, error, n, last)
@@ -53,6 +60,20 @@ class RQCTPTdApi(CtpTdApi):
                 self.gateway.onPositionExtra(posExtra)
 
             self.gateway.status.position_success()
+
+    def onRspQryInstrument(self, data, error, n, last):
+        super(RQCTPTdApi, self).onRspQryInstrument(data, error, n, last)
+
+        contractExtra = ContractExtra()
+        contractExtra.symbol = data['InstrumentID']
+
+        contractExtra.expireDate = data['ExpireDate']
+        contractExtra.openDate = data['OpenDate']
+        contractExtra.longMarginRatio = data['LongMarginRatio']
+
+        self.gateway.onContractExtra(contractExtra)
+        if last:
+            self.gateway.status.contract_success()
 
 
 class RQCTPMdApi(CtpMdApi):
@@ -77,20 +98,27 @@ class RQVNCTPGateway(CtpGateway):
 
         self.status = InitStatus()
 
-    def do_init(self, login_dict):
-        # TODO: 加入超时重试功能
-        self.connect(login_dict)
+    def connect(self, login_dict=None):
+        super(RQVNCTPGateway, self).connect(login_dict)
         self.status.wait_until_contract(timeout=10)
         sleep(1)
+
+    def do_init(self, login_dict):
+        # TODO: 加入超时重试功能
         self.qryAccount()
         self.status.wait_until_account(timeout=10)
         sleep(1)
         self.qryPosition()
         self.status.wait_until_position(timeout=10)
 
-    def onPositionExtra(self, posExtra):
+    def onPositionExtra(self, positionExtra):
         event = Event(type_=EVENT_POSITION_EXTRA)
-        event.dict_['data'] = posExtra
+        event.dict_['data'] = positionExtra
+        self.eventEngine.put(event)
+
+    def onContractExtra(self, contractExtra):
+        event = Event(type_=EVENT_CONTRACT_EXTRA)
+        event.dict_['data'] = contractExtra
         self.eventEngine.put(event)
 
 

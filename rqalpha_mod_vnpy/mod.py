@@ -19,6 +19,7 @@ class VNPYMod(AbstractMod):
     def start_up(self, env, mod_config):
         self._env = env
         self._engine = RQVNPYEngine(env, mod_config)
+        self._engine.connect()
         self._env.set_broker(VNPYBroker(env, self._engine))
         self._env.set_event_source(VNPYEventSource(env, self._engine))
         self._env.set_data_source(VNPYDataSource(env, self._engine))
