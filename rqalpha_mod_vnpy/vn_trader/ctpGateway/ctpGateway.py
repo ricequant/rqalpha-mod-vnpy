@@ -680,7 +680,6 @@ class CtpTdApi(TdApi):
             
         # 所有持仓数据都更新后，再将缓存中的持仓情况发送到事件引擎中
         if last:
-            print 'if_last in ctpgateway'
             for buf in self.posBufferDict.values():
                 pos = buf.getPos()
                 self.gateway.onPosition(pos)
