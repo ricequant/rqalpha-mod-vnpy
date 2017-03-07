@@ -266,8 +266,10 @@ class RQVNPortfolio(FuturePortfolio):
 
 
 class RQVNCount(FutureAccount):
-    def __init__(self, env, start_date):
+    def __init__(self, env, start_date, data_cache):
         super(RQVNCount, self).__init__(env, 0, start_date)
+
+        self._data_cache = data_cache
 
         self._vnpy_order_cache = []
         self._vnpy_trade_cache = []
@@ -278,15 +280,15 @@ class RQVNCount(FutureAccount):
 
         self.inited = False
 
-    def do_init(self, contract_dict):
+    def do_init(self):
         order_list = []
         for vnpy_order in self._vnpy_order_cache:
-            contract = contract_dict.get(_order_book_id(vnpy_order.symbol))
+            contract = self._data_cache.get_contract(vnpy_order.symbol)
             order = RQVNOrder(vnpy_order, contract)
             order_list.append(order)
         trade_list = []
         for vnpy_trade in self._vnpy_trade_cache:
-            contract = contract_dict.get(_order_book_id(vnpy_trade.symbol))
+            contract = self._data_cache.get_contract(vnpy_trade.symbol)
             order = RQVNOrder.create_from_vnpy_trade__(vnpy_trade, contract)
             trade = RQVNTrade(vnpy_trade, order)
             trade_list.append(trade)
@@ -296,14 +298,16 @@ class RQVNCount(FutureAccount):
         for order in order_list:
             order_book_id = order.order_book_id
             if order_book_id not in self._position_cache:
-                contract = contract_dict.get(order_book_id)
+                symbol = self._data_cache.get_symbol(order_book_id)
+                contract = self._data_cache.get_contract(symbol)
                 self._position_cache[order_book_id] = RQVNFuturePosition(order_book_id, contract)
             self._position_cache[order_book_id].update_with_hist_order(order)
 
         for trade in trade_list:
             order_book_id = trade.order_book_id
             if order_book_id not in self._position_cache:
-                contract = contract_dict.get(order_book_id)
+                symbol = self._data_cache.get_symbol(order_book_id)
+                contract = self._data_cache.get_contract(symbol)
                 self._position_cache[order_book_id] = RQVNFuturePosition(order_book_id, contract)
             self._position_cache[order_book_id].update_with_hist_trade(trade)
 

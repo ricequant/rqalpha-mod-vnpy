@@ -26,24 +26,14 @@ from .utils import SIDE_MAPPING, ORDER_TYPE_MAPPING, POSITION_EFFECT_MAPPING
 _engine = None
 
 
-def _order_book_id(symbol):
-    if len(symbol) < 4:
-        return None
-    if symbol[-4] not in '0123456789':
-        order_book_id = symbol[:2] + '1' + symbol[-3:]
-    else:
-        order_book_id = symbol
-    return order_book_id.upper()
-
-
 class RQVNPYEngine(object):
-    def __init__(self, env, config):
+    def __init__(self, env, config, data_cache):
         self._env = env
         self._config = config
         self.event_engine = EventEngine2()
         self.event_engine.start()
 
-        self.accounts = {ACCOUNT_TYPE.FUTURE: RQVNCount(env, env.config.base.start_date)}
+        self.accounts = {ACCOUNT_TYPE.FUTURE: RQVNCount(env, env.config.base.start_date, data_cache)}
 
         self.gateway_type = None
         self.vnpy_gateway = None
@@ -51,7 +41,7 @@ class RQVNPYEngine(object):
         self.account_inited = None
 
         self._init_gateway()
-        self._data_cache = DataCache()
+        self._data_cache = data_cache
 
         self._tick_que = Queue()
 
@@ -63,7 +53,8 @@ class RQVNPYEngine(object):
         account = self._get_account_for(order.order_book_id)
         self._env.event_bus.publish_event(EVENT.ORDER_PENDING_NEW, account, order)
 
-        contract = self._data_cache.get_contract(order.order_book_id)
+        symbol = self._data_cache.get_symbol(order.order_book_id)
+        contract = self._data_cache.get_contract(symbol)
 
         if contract is None:
             self._env.event_bus.publish_event(EVENT.ORDER_PENDING_CANCEL)
@@ -130,7 +121,7 @@ class RQVNPYEngine(object):
                     order._mark_rejected('Order was rejected or cancelled by vnpy.')
                     self._env.event_bus.publish_event(EVENT.ORDER_UNSOLICITED_UPDATE, account, order)
         else:
-            account = self._get_account_for(_order_book_id(vnpy_order.symbol))
+            account = self._get_account_for(self._data_cache.get_order_book_id(vnpy_order.symbol))
             if not account.inited:
                 account.put_vnpy_hist_order(vnpy_order)
             else:
@@ -145,12 +136,12 @@ class RQVNPYEngine(object):
         vnpy_trade = event.dict_['data']
         system_log.debug("on_trade {}", vnpy_trade.__dict__)
         order = self._data_cache.get_order(vnpy_trade.vtOrderID)
-        account = self._get_account_for(_order_book_id(vnpy_trade.symbol))
+        account = self._get_account_for(self._data_cache.get_order_book_id(vnpy_trade.symbol))
         if not account.inited:
             account.put_vnpy_hist_trade(vnpy_trade)
         else:
             if order is None:
-                contract = self._data_cache.get_contract(_order_book_id(vnpy_trade.symbol))
+                contract = self._data_cache.get_contract(vnpy_trade.symbol)
                 order = RQVNOrder.create_from_vnpy_trade__(vnpy_trade, contract)
             trade = RQVNTrade(vnpy_trade, order)
             # TODO: 以下三行是否需要在 mod 中实现？
@@ -171,16 +162,14 @@ class RQVNPYEngine(object):
         system_log.debug("on_contract_extra {}", contract_extra.__dict__)
         self._data_cache.put_contract_or_extra(contract_extra)
 
-    def get_all_contract_dict(self):
-        return self._data_cache.get_all_contract_dict()
-
     # ------------------------------------ tick生命周期 ------------------------------------
     def on_universe_changed(self, universe):
         for order_book_id in universe:
             self.subscribe(order_book_id)
 
     def subscribe(self, order_book_id):
-        contract = self._data_cache.get_contract(order_book_id)
+        symbol = self._data_cache.get_symbol()
+        contract = self._data_cache.get_contract(symbol)
         if contract is None:
             system_log.error('Cannot find contract whose order_book_id is %s' % order_book_id)
             return
@@ -195,7 +184,7 @@ class RQVNPYEngine(object):
     def on_tick(self, event):
         vnpy_tick = event.dict_['data']
         system_log.debug("vnpy tick {}", vnpy_tick.__dict__)
-        order_book_id = _order_book_id(vnpy_tick.symbol)
+        order_book_id = self._data_cache.get_order_book_id(vnpy_tick.symbol)
         tick = {
             'order_book_id': order_book_id,
             'datetime': parse('%s %s' % (vnpy_tick.date, vnpy_tick.time)),
@@ -252,26 +241,25 @@ class RQVNPYEngine(object):
                 system_log.debug("get tick timeout")
                 continue
 
-    def get_tick_snapshot(self, order_book_id):
-        return self._data_cache.get_tick_snapshot(order_book_id)
-
     # ------------------------------------ account生命周期 ------------------------------------
     def on_positions(self, event):
         vnpy_position = event.dict_['data']
         system_log.debug("on_positions {}", vnpy_position.__dict__)
-        order_book_id = _order_book_id(vnpy_position.symbol)
+        order_book_id = self._data_cache.get_order_book_id(vnpy_position.symbol)
         account = self._get_account_for(order_book_id)
         if not account.inited:
-            contract = self._data_cache.get_contract(order_book_id)
+            symbol = self._data_cache.get_symbol(order_book_id)
+            contract = self._data_cache.get_contract(symbol)
             account.put_vnpy_position(vnpy_position, contract)
 
     def on_position_extra(self, event):
         vnpy_position_extra = event.dict_['data']
         system_log.debug("on_position_extra {}", vnpy_position_extra.__dict__)
-        order_book_id = _order_book_id(vnpy_position_extra.symbol)
+        order_book_id = self._data_cache.get_order_book_id(vnpy_position_extra.symbol)
         account = self._get_account_for(order_book_id)
         if not account.inited:
-            contract = self._data_cache.get_contract(order_book_id)
+            symbol = self._data_cache.get_symbol(order_book_id)
+            contract = self._data_cache.get_contract(symbol)
             account.put_vnpy_position_extra(vnpy_position_extra, contract)
 
     def on_account(self, event):
@@ -301,7 +289,7 @@ class RQVNPYEngine(object):
         for account in self.accounts.values():
             if account.inited:
                 continue
-            account.do_init(self._data_cache.get_contract_dict())
+            account.do_init()
 
     def exit(self):
         self.vnpy_gateway.close()
@@ -331,86 +319,3 @@ class RQVNPYEngine(object):
         return self.accounts[account_type]
 
 
-class DataCache(object):
-    def __init__(self):
-        self._order_dict = {}
-        self._vnpy_order_dict = {}
-        self._open_order_dict = {}
-
-        self._contract_dict = {}
-        self._contract_cache = {}
-
-        self._tick_snapshot_dict = {}
-
-    @staticmethod
-    def _order_book_id(symbol):
-        if len(symbol) < 4:
-            return None
-        if symbol[-4] not in '0123456789':
-            order_book_id = symbol[:2] + '1' + symbol[-3:]
-        else:
-            order_book_id = symbol
-        return order_book_id.upper()
-
-    @property
-    def open_orders(self):
-        return list(self._open_order_dict.values())
-
-    def put_order(self, vnpy_order_id, order):
-        self._order_dict[vnpy_order_id] = order
-
-    def put_open_order(self, vnpy_order_id, order):
-        self._open_order_dict[vnpy_order_id] = order
-
-    def put_vnpy_order(self, order_id, vnpy_order):
-        self._vnpy_order_dict[order_id] = vnpy_order
-
-    def put_contract(self, vnpy_contract):
-        order_book_id = self._order_book_id(vnpy_contract.symbol)
-        self._contract_dict[order_book_id] = vnpy_contract
-
-    def put_contract_or_extra(self, contract_or_extra):
-        symbol = contract_or_extra.symbol
-        if symbol not in self._contract_cache:
-            self._contract_cache[symbol] = contract_or_extra.__dict__
-        else:
-            self._contract_cache[symbol].update(contract_or_extra.__dict__)
-
-    def del_open_order(self, vnpy_order_id):
-        if vnpy_order_id in self._open_order_dict:
-            del self._open_order_dict[vnpy_order_id]
-
-    def get_order(self, vnpy_order_id):
-        try:
-            return self._order_dict[vnpy_order_id]
-        except KeyError:
-            return
-
-    def get_vnpy_order(self, order_id):
-        try:
-            return self._vnpy_order_dict[order_id]
-        except KeyError:
-            return
-
-    def get_contract(self, order_book_id):
-        try:
-            return self._contract_dict[order_book_id]
-        except KeyError:
-            system_log.error('Cannot find such contract whose order_book_id is {} ', order_book_id)
-
-    def put_tick_snapshot(self, tick):
-        order_book_id = tick['order_book_id']
-        self._tick_snapshot_dict[order_book_id] = tick
-
-    def get_tick_snapshot(self, order_book_id):
-        try:
-            return self._tick_snapshot_dict[order_book_id]
-        except KeyError:
-            system_log.error('Cannot find such tick whose order_book_id is {} ', order_book_id)
-            return None
-
-    def get_contract_dict(self):
-        return self._contract_dict
-
-    def get_all_contract_dict(self):
-        return self._contract_cache
