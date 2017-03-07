@@ -20,7 +20,7 @@ from .vn_trader.vtConstant import CURRENCY_CNY
 from .vn_trader.vtConstant import PRODUCT_FUTURES
 
 from .vnpy_gateway import EVENT_POSITION_EXTRA, EVENT_CONTRACT_EXTRA, EVENT_COMMISSION
-from .data_factory import RQVNOrder, RQVNTrade, RQVNCount
+from .data_factory import RQVNOrder, RQVNTrade, RQVNAccount
 from .utils import SIDE_MAPPING, ORDER_TYPE_MAPPING, POSITION_EFFECT_MAPPING
 
 _engine = None
@@ -33,7 +33,7 @@ class RQVNPYEngine(object):
         self.event_engine = EventEngine2()
         self.event_engine.start()
 
-        self.accounts = {ACCOUNT_TYPE.FUTURE: RQVNCount(env, env.config.base.start_date, data_cache)}
+        self.accounts = {ACCOUNT_TYPE.FUTURE: RQVNAccount(env, env.config.base.start_date, data_cache)}
 
         self.gateway_type = None
         self.vnpy_gateway = None
@@ -154,9 +154,9 @@ class RQVNPYEngine(object):
                 order = RQVNOrder.create_from_vnpy_trade__(vnpy_trade, contract)
             trade = RQVNTrade(vnpy_trade, order)
             # TODO: 以下三行是否需要在 mod 中实现？
-            # trade._commission = account.commission_decider.get_commission(trade)
-            # trade._tax = account.tax_decider.get_tax(trade)
-            # order._fill(trade)
+            trade._commission = account.commission_decider.get_commission(trade)
+            trade._tax = account.tax_decider.get_tax(trade)
+            order._fill(trade)
             self._env.event_bus.publish_event(EVENT.TRADE, account, trade)
 
     # ------------------------------------ instrument生命周期 ------------------------------------

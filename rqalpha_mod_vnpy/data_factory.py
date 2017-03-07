@@ -10,6 +10,7 @@ from rqalpha.model.account.future_account import FutureAccount
 from rqalpha.model.portfolio.future_portfolio import FuturePortfolio
 from rqalpha.model.position.future_position import FuturePosition
 from rqalpha.const import ORDER_STATUS, ORDER_TYPE, POSITION_EFFECT, ACCOUNT_TYPE, SIDE
+from rqalpha.execution_context import ExecutionContext
 from .vn_trader.vtConstant import EXCHANGE_SHFE, OFFSET_OPEN, OFFSET_CLOSETODAY
 from .vn_trader.vtConstant import DIRECTION_LONG, DIRECTION_SHORT, DIRECTION_NET
 from .utils import SIDE_REVERSE, POSITION_EFFECT_MAPPING, ORDER_TYPE_MAPPING
@@ -75,7 +76,7 @@ class RQVNOrder(Order):
         self._order_book_id = _order_book_id(vnpy_order.symbol)
         self._side = SIDE_REVERSE[vnpy_order.direction]
 
-        if contract.exchange == EXCHANGE_SHFE:
+        if contract['exchange'] == EXCHANGE_SHFE:
             if vnpy_order.offset == OFFSET_OPEN:
                 self._position_effect = POSITION_EFFECT.OPEN
             elif vnpy_order.offset == OFFSET_CLOSETODAY:
@@ -108,7 +109,7 @@ class RQVNOrder(Order):
         order._quantity = vnpy_trade.volume
         order._side = SIDE_REVERSE[vnpy_trade.direction]
 
-        if contract.exchange == EXCHANGE_SHFE:
+        if contract['exchange'] == EXCHANGE_SHFE:
             if vnpy_trade.offset == OFFSET_OPEN:
                 order._position_effect = POSITION_EFFECT.OPEN
             elif vnpy_trade.offset == OFFSET_CLOSETODAY:
@@ -138,9 +139,6 @@ class RQVNTrade(Trade):
         self._price = vnpy_trade.price
         self._amount = vnpy_trade.volume
         self._order = order
-        # TODO: 查询合约commission信息并计算trade的commission，需要扩展CTPGateway并添加新的数据类，
-        # 另一种解决方案是在 data_source 内实现 get_all_instruments, 但是个别字段需要单独请求CTP，貌似不太现实。
-        self._commission = 0.
         self._tax = 0.
         self._trade_id = next(self.trade_id_gen)
         self._close_today_amount = 0.
@@ -152,7 +150,7 @@ class RQVNFuturePosition(FuturePosition):
         super(RQVNFuturePosition, self).__init__(order_book_id)
 
         if contract is not None:
-            self._contract_multiplier = contract.size
+            self._contract_multiplier = contract['size']
 
         self._buy_final_holding = None
         self._sell_final_holding = None
@@ -183,6 +181,7 @@ class RQVNFuturePosition(FuturePosition):
             self._sell_daily_realized_pnl = vnpy_position_extra.closeProfit
 
     def update_with_hist_trade(self, trade):
+        # TODO: 队列的算法好像是错的，待修改
         order = trade.order
         trade_quantity = trade.last_quantity
         trade_value = trade.last_price * trade_quantity * position._contract_multiplier
@@ -265,9 +264,9 @@ class RQVNPortfolio(FuturePortfolio):
             self._total_commission += position.commission
 
 
-class RQVNCount(FutureAccount):
+class RQVNAccount(FutureAccount):
     def __init__(self, env, start_date, data_cache):
-        super(RQVNCount, self).__init__(env, 0, start_date)
+        super(RQVNAccount, self).__init__(env, 0, start_date)
 
         self._data_cache = data_cache
 
@@ -291,6 +290,7 @@ class RQVNCount(FutureAccount):
             contract = self._data_cache.get_contract(vnpy_trade.symbol)
             order = RQVNOrder.create_from_vnpy_trade__(vnpy_trade, contract)
             trade = RQVNTrade(vnpy_trade, order)
+            trade._commission = self.commission_decider.get_commission(trade)
             trade_list.append(trade)
         order_list = sorted(order_list, key=lambda x: x.datetime)
         trade_list = sorted(trade_list, key=lambda x: x.datetime)
