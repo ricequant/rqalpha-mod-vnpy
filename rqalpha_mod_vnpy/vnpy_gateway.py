@@ -12,6 +12,7 @@ from .vn_trader.eventEngine import Event
 
 EVENT_POSITION_EXTRA = 'ePositionExtra'
 EVENT_CONTRACT_EXTRA = 'eContractExtra'
+EVENT_COMMISSION = 'eCommission'
 
 
 # ------------------------------------ 自定义或扩展数据类型 ------------------------------------
@@ -35,6 +36,21 @@ class ContractExtra(VtBaseData):
         self.expireDate = EMPTY_STRING
         self.longMarginRatio = EMPTY_FLOAT
         self.shortMarginRatio = EMPTY_FLOAT
+
+
+class CommissionData(VtBaseData):
+    def __init__(self):
+        super(CommissionData, self).__init__()
+
+        self.symbol = EMPTY_STRING
+
+        self.OpenRatioByMoney = EMPTY_FLOAT
+        self.CloseRatioByMoney = EMPTY_FLOAT
+        self.OpenRatioByVolume = EMPTY_FLOAT
+        self.CloseRatioByVolume = EMPTY_FLOAT
+        self.CloseTodayRatioByMoney = EMPTY_FLOAT
+        self.CloseTodayRatioByVolume = EMPTY_FLOAT
+
 
 # ------------------------------------ 扩展CTPApi ------------------------------------
 class RQCTPTdApi(CtpTdApi):
@@ -89,10 +105,17 @@ class RQCTPTdApi(CtpTdApi):
         self.reqQryInstrumentCommissionRate(req, self.reqID)
 
     def onRspQryInstrumentCommissionRate(self, data, error, n, last):
+        commissionData = CommissionData()
+        commissionData.symbol = data['InstrumentID']
 
+        commissionData.OpenRatioByMoney = data['OpenRatioByMoney']
+        commissionData.OpenRatioByVolume = data['OpenRatioByVolume']
+        commissionData.CloseRatioByMoney = data['CloseRatioByMoney']
+        commissionData.CloseRatioByVolume = data['CloseRatioByVolume']
+        commissionData.CloseTodayRatioByMoney = data['CloseTodayRatioByMoney']
+        commissionData.CloseTodayRatioByVolume = data['CloseTodayRatioByVolume']
 
-        print data
-        print last
+        self.gateway.onCommission(commissionData)
 
 
 class RQCTPMdApi(CtpMdApi):
@@ -127,7 +150,7 @@ class RQVNCTPGateway(CtpGateway):
         self.put_query(self.connect, login_dict=self.login_dict)
         # self.connect(self.login_dict)
         self.status.wait_until_contract(timeout=100)
-        sleep(1)
+        self.wait_until_query_que_empty()
 
     def do_init(self, login_dict):
         # TODO: 加入超时重试功能
@@ -150,6 +173,11 @@ class RQVNCTPGateway(CtpGateway):
         event.dict_['data'] = contractExtra
         self.eventEngine.put(event)
 
+    def onCommission(self, commissionData):
+        event = Event(type_=EVENT_COMMISSION)
+        event.dict_['data'] = commissionData
+        self.eventEngine.put(event)
+
     def put_query(self, query_name, **kwargs):
         self.query_que.put((query_name, kwargs))
 
@@ -165,6 +193,11 @@ class RQVNCTPGateway(CtpGateway):
     def start(self):
         self._activate = True
         self._query_thread.start()
+
+    def wait_until_query_que_empty(self):
+        while True:
+            if self.query_que.empty():
+                break
 
 
 class InitStatus(object):

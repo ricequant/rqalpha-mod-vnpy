@@ -19,7 +19,7 @@ from .vn_trader.vtConstant import STATUS_NOTTRADED, STATUS_PARTTRADED, STATUS_AL
 from .vn_trader.vtConstant import CURRENCY_CNY
 from .vn_trader.vtConstant import PRODUCT_FUTURES
 
-from .vnpy_gateway import EVENT_POSITION_EXTRA, EVENT_CONTRACT_EXTRA
+from .vnpy_gateway import EVENT_POSITION_EXTRA, EVENT_CONTRACT_EXTRA, EVENT_COMMISSION
 from .data_factory import RQVNOrder, RQVNTrade, RQVNCount
 from .utils import SIDE_MAPPING, ORDER_TYPE_MAPPING, POSITION_EFFECT_MAPPING
 
@@ -92,11 +92,19 @@ class RQVNPYEngine(object):
         self.vnpy_gateway.cancelOrder(cancel_order_req)
 
     def on_order(self, event):
+
         vnpy_order = event.dict_['data']
+        system_log.debug("on_order {}", vnpy_order.__dict__)
+        order_book_id = self._data_cache.get_order_book_id(vnpy_order.symbol)
+        future_info = self._data_cache.get_future_info(order_book_id)
+        if future_info is None or ['open_commission_ratio'] not in future_info:
+            self.vnpy_gateway.put_query(self.vnpy_gateway.qryCommission,
+                                        symbol=vnpy_order.symbol,
+                                        exchange=vnpy_order.exchange)
         # FIXME 发现订单会重复返回，此处是否会导致订单丢失有待验证
         if vnpy_order.status == STATUS_UNKNOWN:
             return
-        system_log.debug("on_order {}", vnpy_order.__dict__)
+
         vnpy_order_id = vnpy_order.vtOrderID
         order = self._data_cache.get_order(vnpy_order_id)
 
@@ -134,6 +142,8 @@ class RQVNPYEngine(object):
     # ------------------------------------ trade生命周期 ------------------------------------
     def on_trade(self, event):
         vnpy_trade = event.dict_['data']
+
+        self.vnpy_gateway.qryCommission(vnpy_trade.symbol, vnpy_trade.exchange)
         system_log.debug("on_trade {}", vnpy_trade.__dict__)
         order = self._data_cache.get_order(vnpy_trade.vtOrderID)
         account = self._get_account_for(self._data_cache.get_order_book_id(vnpy_trade.symbol))
@@ -154,7 +164,6 @@ class RQVNPYEngine(object):
     def on_contract(self, event):
         contract = event.dict_['data']
         system_log.debug("on_contract {}", contract.__dict__)
-        self._data_cache.put_contract(contract)
         self._data_cache.put_contract_or_extra(contract)
 
     def on_contract_extra(self, event):
@@ -162,13 +171,18 @@ class RQVNPYEngine(object):
         system_log.debug("on_contract_extra {}", contract_extra.__dict__)
         self._data_cache.put_contract_or_extra(contract_extra)
 
+    def on_commission(self, event):
+        commission_data = event.dict_['data']
+        system_log.debug('on_commission {}', commission_data.__dict__)
+        self._data_cache.put_commission(commission_data)
+
     # ------------------------------------ tick生命周期 ------------------------------------
     def on_universe_changed(self, universe):
         for order_book_id in universe:
             self.subscribe(order_book_id)
 
     def subscribe(self, order_book_id):
-        symbol = self._data_cache.get_symbol()
+        symbol = self._data_cache.get_symbol(order_book_id)
         contract = self._data_cache.get_contract(symbol)
         if contract is None:
             system_log.error('Cannot find contract whose order_book_id is %s' % order_book_id)
@@ -276,14 +290,16 @@ class RQVNPYEngine(object):
         if self.gateway_type == 'CTP':
             try:
                 from .vnpy_gateway import RQVNCTPGateway
-                self.vnpy_gateway = RQVNCTPGateway(self.event_engine, self.gateway_type)
+                self.vnpy_gateway = RQVNCTPGateway(self.event_engine, self.gateway_type,
+                                                   dict(getattr(self._config, self.gateway_type)))
+                self.vnpy_gateway.start()
             except ImportError as e:
                 system_log.exception("No Gateway named CTP")
         else:
             system_log.error('No Gateway named {}', self.gateway_type)
 
     def connect(self):
-        self.vnpy_gateway.connect(dict(getattr(self._config, self.gateway_type)))
+        self.vnpy_gateway.connect_and_init_contract()
 
     def do_init(self):
         for account in self.accounts.values():
@@ -305,6 +321,7 @@ class RQVNPYEngine(object):
         self.event_engine.register(EVENT_POSITION, self.on_positions)
         self.event_engine.register(EVENT_POSITION_EXTRA, self.on_position_extra)
         self.event_engine.register(EVENT_CONTRACT_EXTRA, self.on_contract_extra)
+        self.event_engine.register(EVENT_COMMISSION, self.on_commission)
 
         self._env.event_bus.add_listener(EVENT.POST_UNIVERSE_CHANGED, self.on_universe_changed)
 
