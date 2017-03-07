@@ -95,12 +95,6 @@ class RQVNPYEngine(object):
 
         vnpy_order = event.dict_['data']
         system_log.debug("on_order {}", vnpy_order.__dict__)
-        order_book_id = self._data_cache.get_order_book_id(vnpy_order.symbol)
-        future_info = self._data_cache.get_future_info(order_book_id)
-        if future_info is None or ['open_commission_ratio'] not in future_info:
-            self.vnpy_gateway.put_query(self.vnpy_gateway.qryCommission,
-                                        symbol=vnpy_order.symbol,
-                                        exchange=vnpy_order.exchange)
         # FIXME 发现订单会重复返回，此处是否会导致订单丢失有待验证
         if vnpy_order.status == STATUS_UNKNOWN:
             return
@@ -142,9 +136,14 @@ class RQVNPYEngine(object):
     # ------------------------------------ trade生命周期 ------------------------------------
     def on_trade(self, event):
         vnpy_trade = event.dict_['data']
-
-        self.vnpy_gateway.qryCommission(vnpy_trade.symbol, vnpy_trade.exchange)
         system_log.debug("on_trade {}", vnpy_trade.__dict__)
+        order_book_id = self._data_cache.get_order_book_id(vnpy_trade.symbol)
+        future_info = self._data_cache.get_future_info(order_book_id)
+        if future_info is None or ['open_commission_ratio'] not in future_info:
+            self.vnpy_gateway.put_query(self.vnpy_gateway.qryCommission,
+                                        symbol=vnpy_trade.symbol,
+                                        exchange=vnpy_trade.exchange)
+        
         order = self._data_cache.get_order(vnpy_trade.vtOrderID)
         account = self._get_account_for(self._data_cache.get_order_book_id(vnpy_trade.symbol))
         if not account.inited:
