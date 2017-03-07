@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 from time import sleep, time
+from Queue import Queue, Empty
+from threading import Thread
 
 from .vn_trader.ctpGateway.ctpGateway import CtpGateway
 from .vn_trader.ctpGateway.ctpGateway import CtpTdApi, CtpMdApi
@@ -32,7 +34,7 @@ class ContractExtra(VtBaseData):
         self.openDate = EMPTY_STRING
         self.expireDate = EMPTY_STRING
         self.longMarginRatio = EMPTY_FLOAT
-
+        self.shortMarginRatio = EMPTY_FLOAT
 
 # ------------------------------------ 扩展CTPApi ------------------------------------
 class RQCTPTdApi(CtpTdApi):
@@ -70,10 +72,27 @@ class RQCTPTdApi(CtpTdApi):
         contractExtra.expireDate = data['ExpireDate']
         contractExtra.openDate = data['OpenDate']
         contractExtra.longMarginRatio = data['LongMarginRatio']
+        contractExtra.shortMarginRatio = data['ShortMarginRatio']
 
         self.gateway.onContractExtra(contractExtra)
         if last:
             self.gateway.status.contract_success()
+
+    def reqCommission(self, instrumentId, exchangeId, userId, brokerId):
+        self.reqID += 1
+        req = {
+            'InstrumentID': instrumentId,
+            'InvestorID': userId,
+            'BrokerID': brokerId,
+            'ExchangeID': exchangeId
+        }
+        self.reqQryInstrumentCommissionRate(req, self.reqID)
+
+    def onRspQryInstrumentCommissionRate(self, data, error, n, last):
+
+
+        print data
+        print last
 
 
 class RQCTPMdApi(CtpMdApi):
@@ -83,7 +102,7 @@ class RQCTPMdApi(CtpMdApi):
 
 # ------------------------------------ order生命周期 ------------------------------------
 class RQVNCTPGateway(CtpGateway):
-    def __init__(self, event_engine, gateway_name):
+    def __init__(self, event_engine, gateway_name, login_dict):
         super(CtpGateway, self).__init__(event_engine, gateway_name)
 
         self.mdApi = RQCTPMdApi(self)
@@ -98,9 +117,16 @@ class RQVNCTPGateway(CtpGateway):
 
         self.status = InitStatus()
 
-    def connect(self, login_dict=None):
-        super(RQVNCTPGateway, self).connect(login_dict)
-        self.status.wait_until_contract(timeout=10)
+        self.login_dict = login_dict
+
+        self.query_que = Queue()
+        self._activate = True
+        self._query_thread = Thread(target=self._process)
+
+    def connect_and_init_contract(self):
+        self.put_query(self.connect, login_dict=self.login_dict)
+        # self.connect(self.login_dict)
+        self.status.wait_until_contract(timeout=100)
         sleep(1)
 
     def do_init(self, login_dict):
@@ -111,6 +137,9 @@ class RQVNCTPGateway(CtpGateway):
         self.qryPosition()
         self.status.wait_until_position(timeout=10)
 
+    def qryCommission(self, symbol, exchange):
+        self.tdApi.reqCommission(symbol, exchange, self.login_dict['userID'], self.login_dict['brokerID'])
+
     def onPositionExtra(self, positionExtra):
         event = Event(type_=EVENT_POSITION_EXTRA)
         event.dict_['data'] = positionExtra
@@ -120,6 +149,22 @@ class RQVNCTPGateway(CtpGateway):
         event = Event(type_=EVENT_CONTRACT_EXTRA)
         event.dict_['data'] = contractExtra
         self.eventEngine.put(event)
+
+    def put_query(self, query_name, **kwargs):
+        self.query_que.put((query_name, kwargs))
+
+    def _process(self):
+        while self._activate:
+            try:
+                query = self.query_que.get(block=True, timeout=1)
+            except Empty:
+                continue
+            query[0](**query[1])
+            sleep(0.5)
+
+    def start(self):
+        self._activate = True
+        self._query_thread.start()
 
 
 class InitStatus(object):
