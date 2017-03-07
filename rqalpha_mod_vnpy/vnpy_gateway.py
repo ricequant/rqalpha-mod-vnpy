@@ -152,7 +152,7 @@ class RQVNCTPGateway(CtpGateway):
         self.status.wait_until_contract(timeout=100)
         self.wait_until_query_que_empty()
 
-    def do_init(self, login_dict):
+    def init_account(self):
         # TODO: 加入超时重试功能
         self.qryAccount()
         self.status.wait_until_account(timeout=10)
@@ -174,6 +174,7 @@ class RQVNCTPGateway(CtpGateway):
         self.eventEngine.put(event)
 
     def onCommission(self, commissionData):
+        print 'on_commission'
         event = Event(type_=EVENT_COMMISSION)
         event.dict_['data'] = commissionData
         self.eventEngine.put(event)

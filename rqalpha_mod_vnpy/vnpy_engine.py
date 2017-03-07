@@ -300,7 +300,8 @@ class RQVNPYEngine(object):
     def connect(self):
         self.vnpy_gateway.connect_and_init_contract()
 
-    def do_init(self):
+    def init_account(self):
+        self.vnpy_gateway.init_account()
         for account in self.accounts.values():
             if account.inited:
                 continue
