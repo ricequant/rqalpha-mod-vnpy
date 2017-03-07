@@ -65,8 +65,8 @@ class RQVNPYEngine(object):
             return
 
         order_req = VtOrderReq()
-        order_req.symbol = contract.symbol
-        order_req.exchange = contract.exchange
+        order_req.symbol = contract['symbol']
+        order_req.exchange = contract['exchange']
         order_req.price = order.price
         order_req.volume = order.quantity
         order_req.direction = SIDE_MAPPING[order.side]
@@ -187,8 +187,8 @@ class RQVNPYEngine(object):
             system_log.error('Cannot find contract whose order_book_id is %s' % order_book_id)
             return
         subscribe_req = VtSubscribeReq()
-        subscribe_req.symbol = contract.symbol
-        subscribe_req.exchange = contract.exchange
+        subscribe_req.symbol = contract['symbol']
+        subscribe_req.exchange = contract['exchange']
         # hard code
         subscribe_req.productClass = PRODUCT_FUTURES
         subscribe_req.currency = CURRENCY_CNY

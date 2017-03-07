@@ -71,7 +71,7 @@ class DataCache(object):
                 # hard code
                 self._future_info_cache[underlying_symbol] = {'speculation': {}}
             self._future_info_cache[underlying_symbol]['speculation'].update({
-                'long_margin_ratio': contract_or_extra.LongMarginRatio,
+                'long_margin_ratio': contract_or_extra.longMarginRatio,
                 'margin_type': MARGIN_TYPE.BY_MONEY,
             })
         if 'shortMarginRatio' in contract_or_extra.__dict__:
@@ -79,7 +79,7 @@ class DataCache(object):
             if underlying_symbol not in self._future_info_cache:
                 self._future_info_cache[underlying_symbol] = {'speculation': {}}
             self._future_info_cache[underlying_symbol]['speculation'].update({
-                'short_margin_ratio': contract_or_extra.ShortMarginRatio,
+                'short_margin_ratio': contract_or_extra.shortMarginRatio,
                 'margin_type': MARGIN_TYPE.BY_MONEY,
             })
 

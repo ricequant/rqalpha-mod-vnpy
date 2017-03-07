@@ -223,7 +223,7 @@ class RQVNFuturePosition(FuturePosition):
 
     def update_with_hist_order(self, order):
         inc_order_quantity = order.quantity
-        inc_order_value = order._frozen_price * created_quantity * self._contract_multiplier
+        inc_order_value = order._frozen_price * inc_order_quantity * self._contract_multiplier
         if order.side == SIDE.BUY:
             if order.position_effect == POSITION_EFFECT.OPEN:
                 self._buy_open_order_quantity += inc_order_quantity
