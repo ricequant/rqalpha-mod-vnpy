@@ -42,10 +42,10 @@ class VNPYBroker(AbstractBroker):
         return self._engine.open_orders
 
     def submit_order(self, order):
-        self._engine.send_order(order, self._vnpy_gateway_type)
+        self._engine.send_order(order)
 
     def cancel_order(self, order):
-        self._engine.cancel_order(order, self._vnpy_gateway_type)
+        self._engine.cancel_order(order)
 
     def update(self, calendar_dt, trading_dt, bar_dict):
         pass

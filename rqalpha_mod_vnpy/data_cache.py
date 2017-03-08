@@ -143,7 +143,7 @@ class DataCache(object):
         underlying_symbol = _underlying_symbol(order_book_id)
         if underlying_symbol not in self._future_info_cache:
             return None
-        if hedge_flag not in self._future_info_cache[hedge_flag]:
+        if hedge_flag not in self._future_info_cache[underlying_symbol]:
             return None
         return self._future_info_cache[underlying_symbol][hedge_flag]
 
