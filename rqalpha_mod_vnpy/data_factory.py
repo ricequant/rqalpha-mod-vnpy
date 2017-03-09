@@ -141,7 +141,7 @@ class RQVNTrade(Trade):
 class AccountCache(object):
     def __init__(self, data_cache):
         self._account_dict = {
-            'orders': [],
+            'orders': {},
             'trades': [],
             'portfolio': {
                 'positions': {}
@@ -154,7 +154,7 @@ class AccountCache(object):
 
     def put_vnpy_order(self, vnpy_order):
         order = RQVNOrder(vnpy_order)
-        self._account_dict['orders'].append(order)
+        self._account_dict['orders'][order.order_id] = order
 
     def put_vnpy_trade(self, vnpy_trade):
         order = RQVNOrder.create_from_vnpy_trade__(vnpy_trade)

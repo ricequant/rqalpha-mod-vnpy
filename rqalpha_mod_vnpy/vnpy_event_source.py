@@ -35,7 +35,7 @@ class VNPYEventSource(AbstractEventSource):
             return (time.hour == 15 and time.minute >= 30) or time.hour == 16
 
         def in_trading_time(time):
-            if time.hour < 15 or time.hour > 21:
+            if time.hour < 15 or time.hour >= 21:
                 return True
             elif time.hour == 20 and time.minute >= 55:
                 return True

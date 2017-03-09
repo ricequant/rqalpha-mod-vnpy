@@ -192,7 +192,7 @@ class RQVNPYEngine(object):
 
     def on_tick(self, event):
         vnpy_tick = event.dict_['data']
-        system_log.debug("vnpy tick {}", vnpy_tick.__dict__)
+        system_log.debug("on_tick {}", vnpy_tick.__dict__)
         order_book_id = self._data_cache.get_order_book_id(vnpy_tick.symbol)
         tick = {
             'order_book_id': order_book_id,
