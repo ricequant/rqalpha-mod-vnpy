@@ -1,19 +1,13 @@
 # -*- coding: utf-8 -*-
 from dateutil.parser import parse
-from datetime import timedelta, date
-from six import iteritems
+from datetime import timedelta
 
 from rqalpha.model.order import Order
 from rqalpha.model.trade import Trade
 from rqalpha.model.instrument import Instrument
-from rqalpha.model.account.future_account import FutureAccount
-from rqalpha.model.portfolio.future_portfolio import FuturePortfolio
-from rqalpha.model.position.future_position import FuturePosition
-from rqalpha.const import ORDER_STATUS, ORDER_TYPE, POSITION_EFFECT, ACCOUNT_TYPE, SIDE
-from rqalpha.execution_context import ExecutionContext
+from rqalpha.const import ORDER_STATUS, ORDER_TYPE, POSITION_EFFECT
 from .vn_trader.vtConstant import EXCHANGE_SHFE, OFFSET_OPEN, OFFSET_CLOSETODAY
-from .vn_trader.vtConstant import DIRECTION_LONG, DIRECTION_SHORT, DIRECTION_NET
-from .utils import SIDE_REVERSE, POSITION_EFFECT_MAPPING, ORDER_TYPE_MAPPING
+from .utils import SIDE_REVERSE
 
 
 def _trading_dt(calendar_dt):
@@ -65,9 +59,9 @@ class RQVNInstrument(Instrument):
 
 
 class RQVNOrder(Order):
-    def __init__(self, vnpy_order=None, contract=None):
+    def __init__(self, vnpy_order=None):
         super(RQVNOrder, self).__init__()
-        if vnpy_order is None or contract is None:
+        if vnpy_order is None:
             return
         self._order_id = next(self.order_id_gen)
         self._calendar_dt = parse(vnpy_order.orderTime)
@@ -76,7 +70,7 @@ class RQVNOrder(Order):
         self._order_book_id = _order_book_id(vnpy_order.symbol)
         self._side = SIDE_REVERSE[vnpy_order.direction]
 
-        if contract['exchange'] == EXCHANGE_SHFE:
+        if vnpy_order.exchange == EXCHANGE_SHFE:
             if vnpy_order.offset == OFFSET_OPEN:
                 self._position_effect = POSITION_EFFECT.OPEN
             elif vnpy_order.offset == OFFSET_CLOSETODAY:
@@ -100,7 +94,7 @@ class RQVNOrder(Order):
         self._transaction_cost = 0
 
     @classmethod
-    def create_from_vnpy_trade__(cls, vnpy_trade, contract):
+    def create_from_vnpy_trade__(cls, vnpy_trade):
         order = cls()
         order._order_id = next(order.order_id_gen)
         order._calendar_dt = parse(vnpy_trade.tradeTime)
@@ -109,7 +103,7 @@ class RQVNOrder(Order):
         order._quantity = vnpy_trade.volume
         order._side = SIDE_REVERSE[vnpy_trade.direction]
 
-        if contract['exchange'] == EXCHANGE_SHFE:
+        if vnpy_trade.exchange == EXCHANGE_SHFE:
             if vnpy_trade.offset == OFFSET_OPEN:
                 order._position_effect = POSITION_EFFECT.OPEN
             elif vnpy_trade.offset == OFFSET_CLOSETODAY:
@@ -142,197 +136,3 @@ class RQVNTrade(Trade):
         self._tax = 0.
         self._trade_id = next(self.trade_id_gen)
         self._close_today_amount = 0.
-
-
-class RQVNFuturePosition(FuturePosition):
-        # self._prev_settle_price
-    def __init__(self, order_book_id, contract):
-        super(RQVNFuturePosition, self).__init__(order_book_id)
-
-        if contract is not None:
-            self._contract_multiplier = contract['size']
-
-        self._buy_final_holding = None
-        self._sell_final_holding = None
-        self.commission = 0
-
-    def update_with_vnpy_position(self, vnpy_position):
-        if vnpy_position.direction in [DIRECTION_LONG, DIRECTION_NET]:
-            self._sell_open_order_quantity = vnpy_position.frozen
-            self._buy_avg_open_price = vnpy_position.price
-            self._buy_today_holding_list = [(vnpy_position.price, vnpy_position.position - vnpy_position.ydPosition)]
-            if vnpy_position.ydPosition > 0:
-                self._buy_old_holding_list = [vnpy_position.price, vnpy_position.ydPosition]
-            # self._buy_market_value
-        elif vnpy_position.direction == DIRECTION_SHORT:
-            self._buy_close_order_quantity = vnpy_position.close
-            self._sell_avg_open_price = vnpy_position.price
-            self._sell_today_holding_list = [(vnpy_position.price, vnpy_position.position - vnpy_position.ydPosition)]
-            if vnpy_position.ydPosition > 0:
-                self._sell_old_holding_list = [vnpy_position.price, vnpy_position.ydPosition]
-            # self._sell_market_value
-
-    def update_with_position_extra(self, vnpy_position_extra):
-        if vnpy_position_extra.direction in [DIRECTION_LONG, DIRECTION_NET]:
-            self._buy_daily_realized_pnl = vnpy_position_extra.closeProfit
-            self._buy_avg_open_price = vnpy_position_extra.openCost
-        elif vnpy_position_extra.direction == DIRECTION_SHORT:
-            self._sell_avg_open_price = vnpy_position_extra.closeProfit
-            self._sell_daily_realized_pnl = vnpy_position_extra.closeProfit
-
-    def update_with_hist_trade(self, trade):
-        # TODO: 队列的算法好像是错的，待修改
-        order = trade.order
-        trade_quantity = trade.last_quantity
-        trade_value = trade.last_price * trade_quantity * position._contract_multiplier
-        if order.side == SIDE.BUY:
-            if order.position_effect == POSITION_EFFECT.OPEN:
-                self._buy_open_trade_quantity += trade_quantity
-                self._buy_open_trade_value += trade_value
-                self._buy_open_transaction_cost += trade.commission
-            else:
-                self._buy_close_trade_quantity += trade_quantity
-                self._buy_close_trade_value += trade_value
-                self._buy_close_transaction_cost += trade.commission
-
-                if order.position_effect == POSITION_EFFECT.CLOSE_TODAY:
-                    self._sell_today_holding_list.apend((trade.last_price, trade.last_quantity))
-                else:
-                    self._sell_old_holding_list.append((trade.last_price, trade.last_quantity))
-
-            self._buy_trade_quantity += trade_quantity
-            self._buy_trade_value += trade_value
-        else:
-            if order.position_effect == POSITION_EFFECT.OPEN:
-                self._sell_open_trade_quantity += trade_quantity
-                self._sell_open_trade_value += trade_value
-                self._sell_open_transaction_cost += trade.commission
-            else:
-                self._sell_close_trade_quantity += trade_quantity
-                self._sell_close_trade_value += trade_value
-                self._sell_close_transaction_cost += trade.commission
-
-                if order.position_effect == POSITION_EFFECT.CLOSE_TODAY:
-                    self._buy_today_holding_list.append((trade.last_price, trade.last_quantity))
-                else:
-                    self._buy_old_holding_list.append((trade.last_price, trade.last_quantity))
-
-            self._sell_trade_quantity += trade_quantity
-            self._sell_trade_value += trade_value
-        self.commission += trade.commission
-
-    def update_with_hist_order(self, order):
-        inc_order_quantity = order.quantity
-        inc_order_value = order._frozen_price * inc_order_quantity * self._contract_multiplier
-        if order.side == SIDE.BUY:
-            if order.position_effect == POSITION_EFFECT.OPEN:
-                self._buy_open_order_quantity += inc_order_quantity
-                self._buy_open_order_value += inc_order_value
-            else:
-                self._buy_close_order_quantity += inc_order_quantity
-                self._buy_close_order_value += inc_order_value
-        else:
-            if order.position_effect == POSITION_EFFECT.OPEN:
-                self._sell_open_order_quantity += inc_order_quantity
-                self._sell_open_order_value += inc_order_value
-            else:
-                self._sell_close_order_quantity += inc_order_quantity
-                self._sell_close_order_value += inc_order_value
-
-    def final_update(self):
-        self._daily_realized_pnl = self._buy_daily_realized_pnl + self._sell_daily_realized_pnl
-
-
-class RQVNPortfolio(FuturePortfolio):
-    def __init__(self, vnpy_account, start_date):
-        super(RQVNPortfolio, self).__init__(0, start_date, ACCOUNT_TYPE.FUTURE)
-        self._yesterday_portfolio_value = vnpy_account['preBalance']
-        # self._cash =
-        # self._starting_cash = self._yesterday_portfolio_value
-        # self._start_date = date.today()
-        # self._current_date = date.today(0)
-        # self._frozen_cash =
-        # self._total_tax =
-        # _dividend_receivable
-        # _dividend_info
-        # _daily_transaction_cost
-        # _positions
-
-    def update_positions(self, position_cache):
-        for order_book_id, position in position_cache:
-            # self._position[order_book_id] = position
-            self._total_commission += position.commission
-
-
-class RQVNAccount(FutureAccount):
-    def __init__(self, env, start_date, data_cache):
-        super(RQVNAccount, self).__init__(env, 0, start_date)
-
-        self._data_cache = data_cache
-
-        self._vnpy_order_cache = []
-        self._vnpy_trade_cache = []
-
-        self._position_cache = {}
-
-        self._vnpy_account_cache = None
-
-        self.inited = False
-
-    def do_init(self):
-        order_list = []
-        for vnpy_order in self._vnpy_order_cache:
-            contract = self._data_cache.get_contract(vnpy_order.symbol)
-            order = RQVNOrder(vnpy_order, contract)
-            order_list.append(order)
-        trade_list = []
-        for vnpy_trade in self._vnpy_trade_cache:
-            contract = self._data_cache.get_contract(vnpy_trade.symbol)
-            order = RQVNOrder.create_from_vnpy_trade__(vnpy_trade, contract)
-            trade = RQVNTrade(vnpy_trade, order)
-            trade._commission = self.commission_decider.get_commission(trade)
-            trade_list.append(trade)
-        order_list = sorted(order_list, key=lambda x: x.datetime)
-        trade_list = sorted(trade_list, key=lambda x: x.datetime)
-
-        for order in order_list:
-            order_book_id = order.order_book_id
-            if order_book_id not in self._position_cache:
-                symbol = self._data_cache.get_symbol(order_book_id)
-                contract = self._data_cache.get_contract(symbol)
-                self._position_cache[order_book_id] = RQVNFuturePosition(order_book_id, contract)
-            self._position_cache[order_book_id].update_with_hist_order(order)
-
-        for trade in trade_list:
-            order_book_id = trade.order_book_id
-            if order_book_id not in self._position_cache:
-                symbol = self._data_cache.get_symbol(order_book_id)
-                contract = self._data_cache.get_contract(symbol)
-                self._position_cache[order_book_id] = RQVNFuturePosition(order_book_id, contract)
-            self._position_cache[order_book_id].update_with_hist_trade(trade)
-
-        for position in self._position_cache.values():
-            position.final_update()
-
-        # TODO: 恢复portfolio数据并还原account数据结构
-
-    def put_vnpy_hist_order(self, order):
-        self._vnpy_order_cache.append(order)
-
-    def put_vnpy_hist_trade(self, trade):
-        self._vnpy_trade_cache.append(trade)
-
-    def put_vnpy_position(self, vnpy_position, contract):
-        order_book_id = _order_book_id(vnpy_position.symbol)
-        if order_book_id not in self._position_cache:
-            self._position_cache[order_book_id] = RQVNFuturePosition(order_book_id, contract)
-        self._position_cache[order_book_id].update_with_vnpy_position(vnpy_position)
-
-    def put_vnpy_position_extra(self, vnpy_position_extra, contract):
-        order_book_id = _order_book_id(vnpy_position_extra.symbol)
-        if order_book_id not in self._position_cache:
-            self._position_cache[order_book_id] = RQVNFuturePosition(order_book_id, contract)
-        self._position_cache[order_book_id].update_with_position_extra(vnpy_position_extra)
-
-    def put_vnpy_account(self, vnpy_account):
-        self._vnpy_account_cache = vnpy_account

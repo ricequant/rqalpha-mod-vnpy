@@ -5,9 +5,9 @@ from threading import Thread
 
 from .vn_trader.ctpGateway.ctpGateway import CtpGateway
 from .vn_trader.ctpGateway.ctpGateway import CtpTdApi, CtpMdApi
-from .vn_trader.ctpGateway.ctpGateway import directionMapReverse, posiDirectionMapReverse
-from .vn_trader.vtGateway import VtBaseData, VtContractData
-from .vn_trader.vtConstant import EMPTY_FLOAT, EMPTY_INT, EMPTY_STRING, EMPTY_UNICODE
+from .vn_trader.ctpGateway.ctpGateway import posiDirectionMapReverse
+from .vn_trader.vtGateway import VtBaseData
+from .vn_trader.vtConstant import EMPTY_FLOAT, EMPTY_STRING
 from .vn_trader.eventEngine import Event
 
 EVENT_POSITION_EXTRA = 'ePositionExtra'

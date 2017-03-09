@@ -7,7 +7,6 @@ from rqalpha.utils.logger import system_log
 from rqalpha.interface import AbstractEventSource
 from rqalpha.events import Event, EVENT
 from rqalpha.utils import RqAttrDict
-from rqalpha.api import get_trading_dates
 
 
 class TimePeriod(Enum):
@@ -114,10 +113,3 @@ class VNPYEventSource(AbstractEventSource):
                     self._after_trading_processed = True
                 else:
                     continue
-
-
-if __name__ == '__main__':
-    source = VNPYEventSource(None, None)
-    mark_time_thread = Thread(target=source.mark_time_period, args=(date(2017, 1, 1), date(2017, 5, 1)))
-    mark_time_thread.start()
-    print(source._time_period)

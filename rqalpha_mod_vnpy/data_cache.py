@@ -1,5 +1,4 @@
 from rqalpha.utils.logger import system_log
-from rqalpha.utils import get_upper_underlying_symbol
 from rqalpha.const import COMMISSION_TYPE, MARGIN_TYPE
 
 

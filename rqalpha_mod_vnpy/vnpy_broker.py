@@ -1,6 +1,6 @@
 # encoding: UTF-8
 from rqalpha.interface import AbstractBroker
-from rqalpha.model.account import BenchmarkAccount, StockAccount, FutureAccount
+from rqalpha.model.account import BenchmarkAccount, FutureAccount
 from rqalpha.const import ACCOUNT_TYPE
 
 
