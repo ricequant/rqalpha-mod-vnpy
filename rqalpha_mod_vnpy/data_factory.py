@@ -6,7 +6,7 @@ from rqalpha.model.order import Order
 from rqalpha.model.trade import Trade
 from rqalpha.model.instrument import Instrument
 from rqalpha.const import ORDER_STATUS, ORDER_TYPE, POSITION_EFFECT
-from .vn_trader.vtConstant import EXCHANGE_SHFE, OFFSET_OPEN, OFFSET_CLOSETODAY
+from .vn_trader.vtConstant import EXCHANGE_SHFE, OFFSET_OPEN, OFFSET_CLOSETODAY, DIRECTION_SHORT, DIRECTION_LONG
 from .utils import SIDE_REVERSE
 
 
@@ -136,3 +136,85 @@ class RQVNTrade(Trade):
         self._tax = 0.
         self._trade_id = next(self.trade_id_gen)
         self._close_today_amount = 0.
+
+
+class AccountCache(object):
+    def __init__(self, data_cache):
+        self._account_dict = {
+            'orders': [],
+            'trades': [],
+            'portfolio': {
+                'positions': []
+            }
+        }
+
+        self._data_cache = data_cache
+        self._buy_open_cost_cache = 0.
+        self._sell_open_cost_cache = 0.
+
+    def put_vnpy_order(self, vnpy_order):
+        order = RQVNOrder(vnpy_order)
+        self._account_dict['orders'].append(order)
+
+    def put_vnpy_trade(self, vnpy_trade):
+        order = RQVNOrder.create_from_vnpy_trade__(vnpy_trade)
+        trade = RQVNTrade(vnpy_trade, order)
+        self._account_dict['trades'].apend(trade)
+
+    def put_vnpy_account(self, vnpy_account):
+        if 'total_cash' not in self._account_dict['portfolio']:
+            self._account_dict['portfolio']['total_cash'] = 0.
+
+        if 'frozen' in vnpy_account.__dict__:
+            self._account_dict['portfolio']['total_cash'] += vnpy_account.frozen
+        if 'available' in vnpy_account.__dict__:
+            self._account_dict['portfolio']['total_cash'] += vnpy_account.available
+
+    def put_vnpy_position(self, vnpy_position):
+        order_book_id = _order_book_id(vnpy_position.symbol)
+        if order_book_id not in self._account_dict['portfolio']['positions']:
+            self._account_dict['portfolio']['positions'][order_book_id] = {}
+        if vnpy_position.direction == DIRECTION_LONG:
+            if 'position' in vnpy_position.__dict__:
+                self._account_dict['portfolio']['positions'][order_book_id]['buy_quantity'] = vnpy_position.position
+                self._account_dict['portfolio']['positions'][order_book_id]['buy_today_quantity'] = \
+                    vnpy_position.position - vnpy_position.ydPosition
+            if 'commission' in vnpy_position.__dict__:
+                if 'buy_transaction_cost' not in self._account_dict['portfolio']['positions'][order_book_id]:
+                    self._account_dict['portfolio']['positions'][order_book_id]['buy_transaction_cost'] = 0.
+                self._account_dict['portfolio']['positions'][order_book_id][
+                    'buy_transaction_cost'] += vnpy_position.commission
+            if 'openCost' in vnpy_position.__dict__:
+                self._buy_open_cost_cache += vnpy_position.openCost
+                contract_multiplier = self._data_cache.get_contract(vnpy_position.symbol)['size']
+                buy_quantity = self._account_dict['portfolio']['positions'][order_book_id]['buy_quantity']
+                buy_avg_open_price = self._buy_open_cost_cache / (buy_quantity * contract_multiplier)
+                self._account_dict['portfolio']['positions'][order_book_id]['buy_avg_open_price'] = buy_avg_open_price
+            if 'closeProfit' in vnpy_position.__dict__:
+                self._account_dict['portfolio']['positions'][order_book_id][
+                    'buy_daily_realized_pnl'] += vnpy_position.closeProfit
+
+        elif vnpy_position.direction == DIRECTION_SHORT:
+            if 'position' in vnpy_position.__dict__:
+                self._account_dict['portfolio']['positions'][order_book_id]['sell_quantity'] = vnpy_position.position
+                self._account_dict['portfolio']['positions'][order_book_id][
+                    'sell_today_quantity'] = vnpy_position.position - vnpy_position.ydPosition
+            if 'commission' in vnpy_position.__dict__:
+                if 'sell_transaction_cost' not in self._account_dict['portfolio']['positions'][order_book_id]:
+                    self._account_dict['portfolio']['positions'][order_book_id]['sell_transaction_cost'] = 0.
+                self._account_dict['portfolio']['positions'][order_book_id][
+                    'sell_transaction_cost'] += vnpy_position.commission
+            if 'openCost' in vnpy_position.__dict__:
+                self._sell_open_cost_cache += vnpy_position.openCost
+                contract_multiplier = self._data_cache.get_contract(vnpy_position.symbol)['size']
+                sell_quantity = self._account_dict['portfolio']['positions'][order_book_id]['sell_quantity']
+                sell_avg_open_price = self._sell_open_cost_cache / (sell_quantity * contract_multiplier)
+                self._account_dict['portfolio']['positions'][order_book_id]['buy_avg_open_price'] = sell_avg_open_price
+            if 'closeProfit' in vnpy_position.__dict__:
+                self._account_dict['portfolio']['positions'][order_book_id][
+                    'sell_daily_realized_pnl'] += vnpy_position.closeProfit
+
+        if 'preSettlementPrice' in vnpy_position.__dict__:
+            self._account_dict['portfolio']['positions'][order_book_id][
+                'prev_settle_price'] = vnpy_position.preSettlementPrice
+
