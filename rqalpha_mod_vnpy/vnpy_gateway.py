@@ -12,6 +12,7 @@ from .vn_trader.eventEngine import Event
 
 EVENT_POSITION_EXTRA = 'ePositionExtra'
 EVENT_CONTRACT_EXTRA = 'eContractExtra'
+EVENT_ACCOUNT_EXTRA = 'eAccountExtra'
 EVENT_COMMISSION = 'eCommission'
 
 
@@ -22,6 +23,7 @@ class PositionExtra(VtBaseData):
         self.symbol = EMPTY_STRING
         self.direction = EMPTY_STRING
 
+        self.commission = EMPTY_FLOAT
         self.closeProfit = EMPTY_FLOAT
         self.openCost = EMPTY_FLOAT
 
@@ -52,6 +54,16 @@ class CommissionData(VtBaseData):
         self.CloseTodayRatioByVolume = EMPTY_FLOAT
 
 
+class AccountExtra(VtBaseData):
+    def __init__(self):
+        super(AccountExtra, self).__init__()
+
+        self.accountID = EMPTY_STRING
+        self.vtAccountID = EMPTY_STRING
+
+        self.frozen = EMPTY_FLOAT
+
+
 # ------------------------------------ 扩展CTPApi ------------------------------------
 class RQCTPTdApi(CtpTdApi):
     def __init__(self, gateway):
@@ -60,6 +72,13 @@ class RQCTPTdApi(CtpTdApi):
 
     def onRspQryTradingAccount(self, data, error, n, last):
         super(RQCTPTdApi, self).onRspQryTradingAccount(data, error, n, last)
+
+        accountExtra = AccountExtra()
+        accountExtra.accountID = data['AccountID']
+        accountExtra.vtAccountID = '.'.join([self.gatewayName, account.accountID])
+        accountExtra.frozen = data['FrozenCash']
+        self.gateway.onAccountExtra(accountExtra)
+
         self.gateway.status.account_success()
 
     def onRspQryInvestorPosition(self, data, error, n, last):
@@ -68,6 +87,7 @@ class RQCTPTdApi(CtpTdApi):
         posExtra = PositionExtra()
         posExtra.symbol = data['InstrumentID']
         posExtra.direction = posiDirectionMapReverse.get(data['PosiDirection'])
+        posExtra.commission = data['Commission']
         posExtra.closeProfit = data["CloseProfit"]
         posExtra.openCost = data["OpenCost"]
 
@@ -171,6 +191,11 @@ class RQVNCTPGateway(CtpGateway):
     def onContractExtra(self, contractExtra):
         event = Event(type_=EVENT_CONTRACT_EXTRA)
         event.dict_['data'] = contractExtra
+        self.eventEngine.put(event)
+
+    def onAccountExtra(self, accountExtra):
+        event = Event(type_=EVENT_ACCOUNT_EXTRA)
+        event.dict_['data'] = accountExtra
         self.eventEngine.put(event)
 
     def onCommission(self, commissionData):
