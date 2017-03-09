@@ -1,15 +1,13 @@
 # -*- coding: utf-8 -*-
-from datetime import datetime
 from dateutil.parser import parse
 from Queue import Queue
 from Queue import Empty
-from time import time, sleep
 import numpy as np
 
 from rqalpha.events import EVENT
-from rqalpha.utils import get_account_type
 from rqalpha.utils.logger import system_log
 from rqalpha.const import ACCOUNT_TYPE, ORDER_STATUS
+from rqalpha.model.account import FutureAccount
 
 from .vn_trader.eventEngine import EventEngine2
 from .vn_trader.vtGateway import VtOrderReq, VtCancelOrderReq, VtSubscribeReq
@@ -19,8 +17,8 @@ from .vn_trader.vtConstant import STATUS_NOTTRADED, STATUS_PARTTRADED, STATUS_AL
 from .vn_trader.vtConstant import CURRENCY_CNY
 from .vn_trader.vtConstant import PRODUCT_FUTURES
 
-from .vnpy_gateway import EVENT_POSITION_EXTRA, EVENT_CONTRACT_EXTRA, EVENT_COMMISSION
-from .data_factory import RQVNOrder, RQVNTrade, RQVNAccount
+from .vnpy_gateway import EVENT_POSITION_EXTRA, EVENT_CONTRACT_EXTRA, EVENT_COMMISSION, EVENT_ACCOUNT_EXTRA, EVENT_INIT_ACCOUNT
+from .data_factory import RQVNOrder, RQVNTrade, AccountCache
 from .utils import SIDE_MAPPING, ORDER_TYPE_MAPPING, POSITION_EFFECT_MAPPING
 
 _engine = None
@@ -33,20 +31,20 @@ class RQVNPYEngine(object):
         self.event_engine = EventEngine2()
         self.event_engine.start()
 
-        self.accounts = {ACCOUNT_TYPE.FUTURE: RQVNAccount(env, env.config.base.start_date, data_cache)}
+        self.accounts = {}
+        self.account_inited = None
 
         self.gateway_type = None
         self.vnpy_gateway = None
-        self.init_account_time = None
-        self.account_inited = None
 
         self._init_gateway()
         self._data_cache = data_cache
+        self._account_cache = AccountCache(data_cache)
 
         self._tick_que = Queue()
 
         self._register_event()
-        self._inited = False
+        self._account_inited = False
 
     # ------------------------------------ order生命周期 ------------------------------------
     def send_order(self, order):
@@ -95,7 +93,7 @@ class RQVNPYEngine(object):
 
         vnpy_order = event.dict_['data']
         system_log.debug("on_order {}", vnpy_order.__dict__)
-        # FIXME 发现订单会重复返回，此处是否会导致订单丢失有待验证
+        # FIXME 发现订单会重复返回，此操作是否会导致订单丢失有待验证
         if vnpy_order.status == STATUS_UNKNOWN:
             return
 
@@ -123,9 +121,8 @@ class RQVNPYEngine(object):
                     order._mark_rejected('Order was rejected or cancelled by vnpy.')
                     self._env.event_bus.publish_event(EVENT.ORDER_UNSOLICITED_UPDATE, account, order)
         else:
-            account = self._get_account_for(self._data_cache.get_order_book_id(vnpy_order.symbol))
-            if not account.inited:
-                account.put_vnpy_hist_order(vnpy_order)
+            if not self._account_inited:
+                self._account_cache.put_vnpy_order(vnpy_order)
             else:
                 system_log.error('Order from VNPY dose not match that in rqalpha')
 
@@ -145,9 +142,8 @@ class RQVNPYEngine(object):
                                         exchange=vnpy_trade.exchange)
         
         order = self._data_cache.get_order(vnpy_trade.vtOrderID)
-        account = self._get_account_for(self._data_cache.get_order_book_id(vnpy_trade.symbol))
-        if not account.inited:
-            account.put_vnpy_hist_trade(vnpy_trade)
+        if not self._account_inited:
+            self._account_cache.put_vnpy_trade(vnpy_trade)
         else:
             if order is None:
                 contract = self._data_cache.get_contract(vnpy_trade.symbol)
@@ -258,30 +254,26 @@ class RQVNPYEngine(object):
     def on_positions(self, event):
         vnpy_position = event.dict_['data']
         system_log.debug("on_positions {}", vnpy_position.__dict__)
-        order_book_id = self._data_cache.get_order_book_id(vnpy_position.symbol)
-        account = self._get_account_for(order_book_id)
-        if not account.inited:
-            symbol = self._data_cache.get_symbol(order_book_id)
-            contract = self._data_cache.get_contract(symbol)
-            account.put_vnpy_position(vnpy_position, contract)
+        if not self._account_inited:
+            self._account_cache.put_vnpy_position(vnpy_position)
 
     def on_position_extra(self, event):
         vnpy_position_extra = event.dict_['data']
         system_log.debug("on_position_extra {}", vnpy_position_extra.__dict__)
-        order_book_id = self._data_cache.get_order_book_id(vnpy_position_extra.symbol)
-        account = self._get_account_for(order_book_id)
-        if not account.inited:
-            symbol = self._data_cache.get_symbol(order_book_id)
-            contract = self._data_cache.get_contract(symbol)
-            account.put_vnpy_position_extra(vnpy_position_extra, contract)
+        if not self._account_inited:
+            self._account_cache.put_vnpy_position(vnpy_position_extra)
 
     def on_account(self, event):
         vnpy_account = event.dict_['data']
         system_log.debug("on_account {}", vnpy_account.__dict__)
-        # hard code
-        account = self.accounts[ACCOUNT_TYPE.FUTURE]
-        if not account.inited:
-            account.put_vnpy_account(vnpy_account)
+        if not self._account_inited:
+            self._account_cache.put_vnpy_account(vnpy_account)
+
+    def on_account_extra(self, event):
+        vnpy_account_extra = event.dict_['data']
+        system_log.debug("on_account_extra {}", vnpy_account_extra.__dict__)
+        if not self._account_inited:
+            self._account_cache.put_vnpy_account(vnpy_account_extra)
 
     # ------------------------------------ gateway 和 event engine生命周期 ------------------------------------
     def _init_gateway(self):
@@ -302,10 +294,19 @@ class RQVNPYEngine(object):
 
     def init_account(self):
         self.vnpy_gateway.init_account()
-        for account in self.accounts.values():
-            if account.inited:
-                continue
-            account.do_init()
+
+    def on_init_account(self, event):
+        account_dict = self._account_cache.account_dict
+        if 'units' not in account_dict['portfolio']:
+            account_dict['portfolio']['units'] = self._env.config.base.future_starting_cash
+        if 'yesterday_units' not in account_dict['portfolio']:
+            account_dict['portfolio']['yesterday_units'] = self._env.config.base.future_starting_cash
+
+        self.accounts[ACCOUNT_TYPE.FUTURE] = FutureAccount.from_recovery(self._env,
+                                                                         self._env.config.base.future_starting_cash,
+                                                                         self._env.config.base.start_date,
+                                                                         self._account_cache.account_dict)
+        self._account_inited = True
 
     def exit(self):
         self.vnpy_gateway.close()
@@ -322,6 +323,8 @@ class RQVNPYEngine(object):
         self.event_engine.register(EVENT_POSITION_EXTRA, self.on_position_extra)
         self.event_engine.register(EVENT_CONTRACT_EXTRA, self.on_contract_extra)
         self.event_engine.register(EVENT_COMMISSION, self.on_commission)
+        self.event_engine.register(EVENT_ACCOUNT_EXTRA, self.on_account_extra)
+        self.event_engine.register(EVENT_INIT_ACCOUNT, self.on_init_account)
 
         self._env.event_bus.add_listener(EVENT.POST_UNIVERSE_CHANGED, self.on_universe_changed)
 
@@ -331,8 +334,8 @@ class RQVNPYEngine(object):
         system_log.debug(log.logContent)
 
     def _get_account_for(self, order_book_id):
+        if not self._account_inited:
+            return None
         # hard code
         account_type = ACCOUNT_TYPE.FUTURE
         return self.accounts[account_type]
-
-

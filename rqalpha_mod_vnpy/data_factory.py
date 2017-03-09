@@ -144,7 +144,7 @@ class AccountCache(object):
             'orders': [],
             'trades': [],
             'portfolio': {
-                'positions': []
+                'positions': {}
             }
         }
 
@@ -191,6 +191,8 @@ class AccountCache(object):
                 buy_avg_open_price = self._buy_open_cost_cache / (buy_quantity * contract_multiplier)
                 self._account_dict['portfolio']['positions'][order_book_id]['buy_avg_open_price'] = buy_avg_open_price
             if 'closeProfit' in vnpy_position.__dict__:
+                if 'buy_daily_realized_pnl' not in self._account_dict['portfolio']['positions'][order_book_id]:
+                    self._account_dict['portfolio']['positions'][order_book_id]['buy_daily_realized_pnl'] = 0.
                 self._account_dict['portfolio']['positions'][order_book_id][
                     'buy_daily_realized_pnl'] += vnpy_position.closeProfit
 
@@ -211,6 +213,8 @@ class AccountCache(object):
                 sell_avg_open_price = self._sell_open_cost_cache / (sell_quantity * contract_multiplier)
                 self._account_dict['portfolio']['positions'][order_book_id]['buy_avg_open_price'] = sell_avg_open_price
             if 'closeProfit' in vnpy_position.__dict__:
+                if 'sell_daily_realized_pnl' not in self._account_dict['portfolio']['positions'][order_book_id]:
+                    self._account_dict['portfolio']['positions'][order_book_id]['sell_daily_realized_pnl'] = 0.
                 self._account_dict['portfolio']['positions'][order_book_id][
                     'sell_daily_realized_pnl'] += vnpy_position.closeProfit
 
@@ -218,3 +222,6 @@ class AccountCache(object):
             self._account_dict['portfolio']['positions'][order_book_id][
                 'prev_settle_price'] = vnpy_position.preSettlementPrice
 
+    @property
+    def account_dict(self):
+        return self._account_dict

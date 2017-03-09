@@ -14,6 +14,7 @@ EVENT_POSITION_EXTRA = 'ePositionExtra'
 EVENT_CONTRACT_EXTRA = 'eContractExtra'
 EVENT_ACCOUNT_EXTRA = 'eAccountExtra'
 EVENT_COMMISSION = 'eCommission'
+EVENT_INIT_ACCOUNT = 'eAccountInit'
 
 
 # ------------------------------------ 自定义或扩展数据类型 ------------------------------------
@@ -26,6 +27,7 @@ class PositionExtra(VtBaseData):
         self.commission = EMPTY_FLOAT
         self.closeProfit = EMPTY_FLOAT
         self.openCost = EMPTY_FLOAT
+        self.preSettlementPrice = EMPTY_FLOAT
 
 
 class ContractExtra(VtBaseData):
@@ -75,7 +77,7 @@ class RQCTPTdApi(CtpTdApi):
 
         accountExtra = AccountExtra()
         accountExtra.accountID = data['AccountID']
-        accountExtra.vtAccountID = '.'.join([self.gatewayName, account.accountID])
+        accountExtra.vtAccountID = '.'.join([self.gatewayName, accountExtra.accountID])
         accountExtra.frozen = data['FrozenCash']
         self.gateway.onAccountExtra(accountExtra)
 
@@ -90,6 +92,7 @@ class RQCTPTdApi(CtpTdApi):
         posExtra.commission = data['Commission']
         posExtra.closeProfit = data["CloseProfit"]
         posExtra.openCost = data["OpenCost"]
+        posExtra.preSettlementPrice = data['PreSettlementPrice']
 
         self.posExtraDict[positionName] = posExtra
 
@@ -179,6 +182,8 @@ class RQVNCTPGateway(CtpGateway):
         sleep(1)
         self.qryPosition()
         self.status.wait_until_position(timeout=10)
+        event = Event(type_=EVENT_INIT_ACCOUNT)
+        self.eventEngine.put(event)
 
     def qryCommission(self, symbol, exchange):
         self.tdApi.reqCommission(symbol, exchange, self.login_dict['userID'], self.login_dict['brokerID'])
@@ -199,7 +204,6 @@ class RQVNCTPGateway(CtpGateway):
         self.eventEngine.put(event)
 
     def onCommission(self, commissionData):
-        print 'on_commission'
         event = Event(type_=EVENT_COMMISSION)
         event.dict_['data'] = commissionData
         self.eventEngine.put(event)
