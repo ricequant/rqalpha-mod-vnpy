@@ -4,7 +4,7 @@ from Queue import Queue
 from Queue import Empty
 import numpy as np
 
-from rqalpha.events import EVENT
+from rqalpha.events import EVENT, Event
 from rqalpha.utils.logger import system_log
 from rqalpha.const import ACCOUNT_TYPE, ORDER_STATUS
 from rqalpha.model.account import FutureAccount
@@ -49,15 +49,15 @@ class RQVNPYEngine(object):
     # ------------------------------------ order生命周期 ------------------------------------
     def send_order(self, order):
         account = self._get_account_for(order.order_book_id)
-        self._env.event_bus.publish_event(EVENT.ORDER_PENDING_NEW, account, order)
+        self._env.event_bus.publish_event(Event(EVENT.ORDER_PENDING_NEW, account=account, order=order))
 
         symbol = self._data_cache.get_symbol(order.order_book_id)
         contract = self._data_cache.get_contract(symbol)
 
         if contract is None:
-            self._env.event_bus.publish_event(EVENT.ORDER_PENDING_CANCEL)
+            self._env.event_bus.publish_event(Event(EVENT.ORDER_PENDING_CANCEL))
             order._mark_cancelled('No contract exists whose order_book_id is %s' % order.order_book_id)
-            self._env.event_bus.publish_event(EVENT.ORDER_CANCELLATION_PASS)
+            self._env.event_bus.publish_event(Event(EVENT.ORDER_CANCELLATION_PASS))
 
         if order._is_final():
             return
@@ -78,7 +78,7 @@ class RQVNPYEngine(object):
 
     def cancel_order(self, order):
         account = self._get_account_for(order.order_book_id)
-        self._env.event_bus.publish_event(EVENT.ORDER_PENDING_CANCEL, account, order)
+        self._env.event_bus.publish_event(Event(EVENT.ORDER_PENDING_CANCEL, account=account, order=order))
 
         vnpy_order = self._data_cache.get_vnpy_order(order.order_id)
 
@@ -105,7 +105,7 @@ class RQVNPYEngine(object):
 
             order._activate()
 
-            self._env.event_bus.publish_event(EVENT.ORDER_CREATION_PASS, account, order)
+            self._env.event_bus.publish_event(Event(EVENT.ORDER_CREATION_PASS, account=account, order=order))
 
             self._data_cache.put_vnpy_order(order.order_id, vnpy_order)
             if vnpy_order.status == STATUS_NOTTRADED or vnpy_order.status == STATUS_PARTTRADED:
@@ -116,10 +116,10 @@ class RQVNPYEngine(object):
                 self._data_cache.del_open_order(vnpy_order_id)
                 if order.status == ORDER_STATUS.PENDING_CANCEL:
                     order._mark_cancelled("%d order has been cancelled by user." % order.order_id)
-                    self._env.event_bus.publish_event(EVENT.ORDER_CANCELLATION_PASS, account, order)
+                    self._env.event_bus.publish_event(Event(EVENT.ORDER_CANCELLATION_PASS, account=account, order=order))
                 else:
                     order._mark_rejected('Order was rejected or cancelled by vnpy.')
-                    self._env.event_bus.publish_event(EVENT.ORDER_UNSOLICITED_UPDATE, account, order)
+                    self._env.event_bus.publish_event(Event(EVENT.ORDER_UNSOLICITED_UPDATE, account=account, order=order))
         else:
             if not self._account_inited:
                 self._account_cache.put_vnpy_order(vnpy_order)
@@ -146,14 +146,13 @@ class RQVNPYEngine(object):
             self._account_cache.put_vnpy_trade(vnpy_trade)
         else:
             if order is None:
-                contract = self._data_cache.get_contract(vnpy_trade.symbol)
-                order = RQVNOrder.create_from_vnpy_trade__(vnpy_trade, contract)
+                order = RQVNOrder.create_from_vnpy_trade__(vnpy_trade)
             trade = RQVNTrade(vnpy_trade, order)
             # TODO: 以下三行是否需要在 mod 中实现？
             trade._commission = account.commission_decider.get_commission(trade)
             trade._tax = account.tax_decider.get_tax(trade)
             order._fill(trade)
-            self._env.event_bus.publish_event(EVENT.TRADE, account, trade)
+            self._env.event_bus.publish_event(Event(EVENT.TRADE, account=account, trade=trade))
 
     # ------------------------------------ instrument生命周期 ------------------------------------
     def on_contract(self, event):
@@ -172,7 +171,8 @@ class RQVNPYEngine(object):
         self._data_cache.put_commission(commission_data)
 
     # ------------------------------------ tick生命周期 ------------------------------------
-    def on_universe_changed(self, universe):
+    def on_universe_changed(self):
+        universe = event.universe
         for order_book_id in universe:
             self.subscribe(order_book_id)
 
@@ -263,11 +263,11 @@ class RQVNPYEngine(object):
         if not self._account_inited:
             self._account_cache.put_vnpy_position(vnpy_position_extra)
 
-    def on_account(self, event):
-        vnpy_account = event.dict_['data']
-        system_log.debug("on_account {}", vnpy_account.__dict__)
-        if not self._account_inited:
-            self._account_cache.put_vnpy_account(vnpy_account)
+    # def on_account(self, event):
+    #     vnpy_account = event.dict_['data']
+    #     system_log.debug("on_account {}", vnpy_account.__dict__)
+    #     if not self._account_inited:
+    #         self._account_cache.put_vnpy_account(vnpy_account)
 
     def on_account_extra(self, event):
         vnpy_account_extra = event.dict_['data']
@@ -308,6 +308,10 @@ class RQVNPYEngine(object):
                                                                          self._account_cache.account_dict)
         self._account_inited = True
 
+    def wait_until_account_inited(self):
+        while not self._account_inited:
+            continue
+
     def exit(self):
         self.vnpy_gateway.close()
         self.event_engine.stop()
@@ -318,7 +322,7 @@ class RQVNPYEngine(object):
         self.event_engine.register(EVENT_TRADE, self.on_trade)
         self.event_engine.register(EVENT_TICK, self.on_tick)
         self.event_engine.register(EVENT_LOG, self.on_log)
-        self.event_engine.register(EVENT_ACCOUNT, self.on_account)
+        # self.event_engine.register(EVENT_ACCOUNT, self.on_account)
         self.event_engine.register(EVENT_POSITION, self.on_positions)
         self.event_engine.register(EVENT_POSITION_EXTRA, self.on_position_extra)
         self.event_engine.register(EVENT_CONTRACT_EXTRA, self.on_contract_extra)

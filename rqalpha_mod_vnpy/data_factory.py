@@ -159,18 +159,15 @@ class AccountCache(object):
     def put_vnpy_trade(self, vnpy_trade):
         order = RQVNOrder.create_from_vnpy_trade__(vnpy_trade)
         trade = RQVNTrade(vnpy_trade, order)
-        self._account_dict['trades'].apend(trade)
+        self._account_dict['trades'].append(trade)
 
     def put_vnpy_account(self, vnpy_account):
-        if 'total_cash' not in self._account_dict['portfolio']:
-            self._account_dict['portfolio']['total_cash'] = 0.
-
-        if 'frozen' in vnpy_account.__dict__:
-            self._account_dict['portfolio']['total_cash'] += vnpy_account.frozen
-        if 'available' in vnpy_account.__dict__:
-            self._account_dict['portfolio']['total_cash'] += vnpy_account.available
+        if 'preBalance' in vnpy_account.__dict__:
+            self._account_dict['portfolio']['yesterday_portfolio_value'] = vnpy_account.preBalance
 
     def put_vnpy_position(self, vnpy_position):
+        if 'position' in vnpy_position.__dict__ and vnpy_position.position == 0:
+            return
         order_book_id = _order_book_id(vnpy_position.symbol)
         if order_book_id not in self._account_dict['portfolio']['positions']:
             self._account_dict['portfolio']['positions'][order_book_id] = {}
@@ -198,6 +195,8 @@ class AccountCache(object):
 
         elif vnpy_position.direction == DIRECTION_SHORT:
             if 'position' in vnpy_position.__dict__:
+                if vnpy_position.position == 0:
+                    return
                 self._account_dict['portfolio']['positions'][order_book_id]['sell_quantity'] = vnpy_position.position
                 self._account_dict['portfolio']['positions'][order_book_id][
                     'sell_today_quantity'] = vnpy_position.position - vnpy_position.ydPosition

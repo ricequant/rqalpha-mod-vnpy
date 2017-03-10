@@ -63,7 +63,7 @@ class AccountExtra(VtBaseData):
         self.accountID = EMPTY_STRING
         self.vtAccountID = EMPTY_STRING
 
-        self.frozen = EMPTY_FLOAT
+        self.preBalance = EMPTY_FLOAT
 
 
 # ------------------------------------ 扩展CTPApi ------------------------------------
@@ -78,13 +78,15 @@ class RQCTPTdApi(CtpTdApi):
         accountExtra = AccountExtra()
         accountExtra.accountID = data['AccountID']
         accountExtra.vtAccountID = '.'.join([self.gatewayName, accountExtra.accountID])
-        accountExtra.frozen = data['FrozenCash']
+
+        accountExtra.preBalance = data['PreBalance']
         self.gateway.onAccountExtra(accountExtra)
 
         self.gateway.status.account_success()
 
     def onRspQryInvestorPosition(self, data, error, n, last):
         super(RQCTPTdApi, self).onRspQryInvestorPosition(data, error, n, last)
+
         positionName = '.'.join([data['InstrumentID'], data['PosiDirection']])
         posExtra = PositionExtra()
         posExtra.symbol = data['InstrumentID']
@@ -146,7 +148,7 @@ class RQCTPMdApi(CtpMdApi):
         super(RQCTPMdApi, self).__init__(gateway)
 
 
-# ------------------------------------ order生命周期 ------------------------------------
+# ------------------------------------ 扩展gateway ------------------------------------
 class RQVNCTPGateway(CtpGateway):
     def __init__(self, event_engine, gateway_name, login_dict):
         super(CtpGateway, self).__init__(event_engine, gateway_name)
@@ -177,11 +179,11 @@ class RQVNCTPGateway(CtpGateway):
 
     def init_account(self):
         # TODO: 加入超时重试功能
-        self.qryAccount()
+        self.put_query(self.qryAccount)
         self.status.wait_until_account(timeout=10)
-        sleep(1)
-        self.qryPosition()
+        self.put_query(self.qryPosition)
         self.status.wait_until_position(timeout=10)
+        self.wait_until_query_que_empty()
         event = Event(type_=EVENT_INIT_ACCOUNT)
         self.eventEngine.put(event)
 
@@ -218,7 +220,7 @@ class RQVNCTPGateway(CtpGateway):
             except Empty:
                 continue
             query[0](**query[1])
-            sleep(0.5)
+            sleep(1)
 
     def start(self):
         self._activate = True

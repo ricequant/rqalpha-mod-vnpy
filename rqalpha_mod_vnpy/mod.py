@@ -15,8 +15,9 @@ class VNPYMod(AbstractMod):
         self._engine = None
         self._data_cache = DataCache()
 
-    def init_engine(self):
+    def init_engine(self, event):
         self._engine.init_account()
+        self._engine.wait_until_account_inited()
 
     def start_up(self, env, mod_config):
         self._env = env
