@@ -166,8 +166,6 @@ class AccountCache(object):
             self._account_dict['portfolio']['yesterday_portfolio_value'] = vnpy_account.preBalance
 
     def put_vnpy_position(self, vnpy_position):
-        if 'position' in vnpy_position.__dict__ and vnpy_position.position == 0:
-            return
         order_book_id = _order_book_id(vnpy_position.symbol)
         if order_book_id not in self._account_dict['portfolio']['positions']:
             self._account_dict['portfolio']['positions'][order_book_id] = {}
@@ -185,7 +183,7 @@ class AccountCache(object):
                 self._buy_open_cost_cache += vnpy_position.openCost
                 contract_multiplier = self._data_cache.get_contract(vnpy_position.symbol)['size']
                 buy_quantity = self._account_dict['portfolio']['positions'][order_book_id]['buy_quantity']
-                buy_avg_open_price = self._buy_open_cost_cache / (buy_quantity * contract_multiplier)
+                buy_avg_open_price = self._buy_open_cost_cache / (buy_quantity * contract_multiplier) if buy_quantity != 0 else 0
                 self._account_dict['portfolio']['positions'][order_book_id]['buy_avg_open_price'] = buy_avg_open_price
             if 'closeProfit' in vnpy_position.__dict__:
                 if 'buy_daily_realized_pnl' not in self._account_dict['portfolio']['positions'][order_book_id]:
