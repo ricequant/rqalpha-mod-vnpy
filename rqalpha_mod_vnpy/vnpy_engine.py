@@ -171,7 +171,7 @@ class RQVNPYEngine(object):
         self._data_cache.put_commission(commission_data)
 
     # ------------------------------------ tick生命周期 ------------------------------------
-    def on_universe_changed(self):
+    def on_universe_changed(self, event):
         universe = event.universe
         for order_book_id in universe:
             self.subscribe(order_book_id)
