@@ -9,15 +9,12 @@ from rqalpha.utils.logger import system_log
 from rqalpha.const import ACCOUNT_TYPE, ORDER_STATUS
 from rqalpha.model.account import FutureAccount
 
-from .vn_trader.eventEngine import EventEngine2
-from .vn_trader.vtGateway import VtOrderReq, VtCancelOrderReq, VtSubscribeReq
-from .vn_trader.eventType import EVENT_CONTRACT, EVENT_ORDER, EVENT_TRADE, EVENT_TICK, EVENT_LOG, EVENT_ACCOUNT, EVENT_POSITION
-from .vn_trader.vtConstant import STATUS_NOTTRADED, STATUS_PARTTRADED, STATUS_ALLTRADED, STATUS_CANCELLED, STATUS_UNKNOWN
-
-from .vn_trader.vtConstant import CURRENCY_CNY
-from .vn_trader.vtConstant import PRODUCT_FUTURES
+from .vnpy import VtOrderReq, VtCancelOrderReq, VtSubscribeReq
+from .vnpy import EVENT_CONTRACT, EVENT_ORDER, EVENT_TRADE, EVENT_TICK, EVENT_LOG, EVENT_ACCOUNT, EVENT_POSITION
+from .vnpy import STATUS_NOTTRADED, STATUS_PARTTRADED, STATUS_ALLTRADED, STATUS_CANCELLED, STATUS_UNKNOWN, CURRENCY_CNY, PRODUCT_FUTURES
 
 from .vnpy_gateway import EVENT_POSITION_EXTRA, EVENT_CONTRACT_EXTRA, EVENT_COMMISSION, EVENT_ACCOUNT_EXTRA, EVENT_INIT_ACCOUNT
+from .vnpy_gateway import RQVNEventEngine
 from .data_factory import RQVNOrder, RQVNTrade, AccountCache
 from .utils import SIDE_MAPPING, ORDER_TYPE_MAPPING, POSITION_EFFECT_MAPPING
 
@@ -28,7 +25,7 @@ class RQVNPYEngine(object):
     def __init__(self, env, config, data_cache):
         self._env = env
         self._config = config
-        self.event_engine = EventEngine2()
+        self.event_engine = RQVNEventEngine()
         self.event_engine.start()
 
         self.accounts = {}

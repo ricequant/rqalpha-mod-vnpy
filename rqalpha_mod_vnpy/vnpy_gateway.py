@@ -2,13 +2,11 @@
 from time import sleep, time
 from Queue import Queue, Empty
 from threading import Thread
-
-from .vn_trader.ctpGateway.ctpGateway import CtpGateway
-from .vn_trader.ctpGateway.ctpGateway import CtpTdApi, CtpMdApi
-from .vn_trader.ctpGateway.ctpGateway import posiDirectionMapReverse
-from .vn_trader.vtGateway import VtBaseData
-from .vn_trader.vtConstant import EMPTY_FLOAT, EMPTY_STRING
-from .vn_trader.eventEngine import Event
+from .vnpy import CtpGateway, CtpTdApi, CtpMdApi, posiDirectionMapReverse
+from .vnpy import VtBaseData
+from .vnpy import EMPTY_FLOAT, EMPTY_STRING
+from .vnpy import Event
+from .vnpy import EventEngine2
 
 EVENT_POSITION_EXTRA = 'ePositionExtra'
 EVENT_CONTRACT_EXTRA = 'eContractExtra'
@@ -64,6 +62,25 @@ class AccountExtra(VtBaseData):
         self.vtAccountID = EMPTY_STRING
 
         self.preBalance = EMPTY_FLOAT
+
+
+# ------------------------------------ 扩展事件引擎 ------------------------------------
+class RQVNEventEngine(EventEngine2):
+    def __init__(self):
+        super(RQVNEventEngine, self).__init__()
+
+    def __run(self):
+        """引擎运行"""
+        while self.__active == True:
+            try:
+                event = self.__queue.get(block=True, timeout=10)  # 获取事件的阻塞时间设为1秒
+                self.__process(event)
+            except Empty:
+                pass
+            except Exception as e:
+                system_log.exception("event engine process fail")
+                system_log.error("We can not handle this exception exiting.")
+                os._exit(-1)
 
 
 # ------------------------------------ 扩展CTPApi ------------------------------------
@@ -172,10 +189,21 @@ class RQVNCTPGateway(CtpGateway):
         self._query_thread = Thread(target=self._process)
 
     def connect_and_init_contract(self):
-        self.put_query(self.connect, login_dict=self.login_dict)
+        self.put_query(self.connect)
         # self.connect(self.login_dict)
         self.status.wait_until_contract(timeout=100)
         self.wait_until_query_que_empty()
+
+    def connect(self):
+        userID = str(self.login_dict['userID'])
+        password = str(self.login_dict['password'])
+        brokerID = str(self.login_dict['brokerID'])
+        tdAddress = str(self.login_dict['tdAddress'])
+        mdAddress = str(self.login_dict['mdAddress'])
+
+        self.mdApi.connect(userID, password, brokerID, mdAddress)
+        self.tdApi.connect(userID, password, brokerID, tdAddress, None, None)
+        self.initQuery()
 
     def init_account(self):
         # TODO: 加入超时重试功能
