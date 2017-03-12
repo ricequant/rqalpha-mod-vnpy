@@ -1,0 +1,3 @@
+[submodule "rqalpha_mod_vnpy/vnpy/vnpy"]
+	path = rqalpha_mod_vnpy/vnpy/vnpy
+	url = https://github.com/vnpy/vnpy.git
