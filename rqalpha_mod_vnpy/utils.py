@@ -1,8 +1,8 @@
 from rqalpha.const import SIDE, ORDER_TYPE, POSITION_EFFECT
 
-from .vn_trader.vtConstant import DIRECTION_LONG, DIRECTION_SHORT
-from .vn_trader.vtConstant import PRICETYPE_LIMITPRICE, PRICETYPE_MARKETPRICE
-from .vn_trader.vtConstant import OFFSET_CLOSE, OFFSET_OPEN
+from .vnpy import DIRECTION_LONG, DIRECTION_SHORT
+from .vnpy import PRICETYPE_LIMITPRICE, PRICETYPE_MARKETPRICE
+from .vnpy import OFFSET_CLOSE, OFFSET_OPEN
 
 SIDE_MAPPING = {
     SIDE.BUY: DIRECTION_LONG,

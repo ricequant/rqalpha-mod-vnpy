@@ -6,7 +6,7 @@ from rqalpha.model.order import Order
 from rqalpha.model.trade import Trade
 from rqalpha.model.instrument import Instrument
 from rqalpha.const import ORDER_STATUS, ORDER_TYPE, POSITION_EFFECT
-from .vn_trader.vtConstant import EXCHANGE_SHFE, OFFSET_OPEN, OFFSET_CLOSETODAY, DIRECTION_SHORT, DIRECTION_LONG
+from .vnpy import EXCHANGE_SHFE, OFFSET_OPEN, OFFSET_CLOSETODAY, DIRECTION_SHORT, DIRECTION_LONG
 from .utils import SIDE_REVERSE
 
 
