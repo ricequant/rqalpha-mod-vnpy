@@ -87,7 +87,7 @@ class RQVNPYEngine(object):
         cancel_order_req.exchange = vnpy_order.exchange
         cancel_order_req.sessionID = vnpy_order.sessionID
         cancel_order_req.orderID = vnpy_order.orderID
-        self.vnpy_gateway.cancelOrder(cancel_order_req)
+        self.vnpy_gateway.put_query(self.vnpy_gateway.cancelOrder, cancelOrderReq=cancel_order_req)
 
     def on_order(self, event):
 
@@ -188,7 +188,7 @@ class RQVNPYEngine(object):
         # hard code
         subscribe_req.productClass = PRODUCT_FUTURES
         subscribe_req.currency = CURRENCY_CNY
-        self.vnpy_gateway.subscribe(subscribe_req)
+        self.vnpy_gateway.put_query(self.vnpy_gateway.subscribe, subscribeReq=subscribe_req)
 
     def on_tick(self, event):
         vnpy_tick = event.dict_['data']

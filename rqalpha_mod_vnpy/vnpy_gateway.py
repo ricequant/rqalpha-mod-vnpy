@@ -220,7 +220,7 @@ class RQVNCTPGateway(CtpGateway):
             except Empty:
                 continue
             query[0](**query[1])
-            sleep(1)
+            sleep(0.8)
 
     def start(self):
         self._activate = True
