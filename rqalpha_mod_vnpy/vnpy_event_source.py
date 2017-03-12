@@ -71,7 +71,7 @@ class VNPYEventSource(AbstractEventSource):
                 self._time_period = TimePeriod.CLOSING
 
     def events(self, start_date, end_date, frequency):
-        while datetime.now().date() < start_date:
+        while datetime.now().date() < start_date - timedelta(days=1):
             continue
 
         mark_time_thread = Thread(target=self.mark_time_period, args=(start_date, date.fromtimestamp(2147483647)))
@@ -84,7 +84,7 @@ class VNPYEventSource(AbstractEventSource):
                     self._after_trading_processed = False
                 if not self._before_trading_processed:
                     system_log.debug("VNPYEventSource: before trading event")
-                    yield Event(EVENT.BEFORE_TRADING, datetime.now(), datetime.now() + timedelta(days=1))
+                    yield Event(EVENT.BEFORE_TRADING, calendar_dt=datetime.now(), trading_dt=datetime.now() + timedelta(days=1))
                     self._before_trading_processed = True
                     continue
                 else:
@@ -92,7 +92,7 @@ class VNPYEventSource(AbstractEventSource):
             elif self._time_period == TimePeriod.TRADING:
                 if not self._before_trading_processed:
                     system_log.debug("VNPYEventSource: before trading event")
-                    yield Event(EVENT.BEFORE_TRADING, datetime.now(), datetime.now() + timedelta(days=1))
+                    yield Event(EVENT.BEFORE_TRADING, calendar_dt=datetime.now(), trading_dt=datetime.now() + timedelta(days=1))
                     self._before_trading_processed = True
                     continue
                 else:
@@ -103,13 +103,13 @@ class VNPYEventSource(AbstractEventSource):
                     else:
                         trading_dt = calendar_dt
                     system_log.debug("VNPYEventSource: tick {}", tick)
-                    yield Event(EVENT.TICK, calendar_dt, trading_dt, {"tick": RqAttrDict(tick)})
+                    yield Event(EVENT.TICK, calendar_dt=calendar_dt, trading_dt=trading_dt, tick=RqAttrDict(tick))
             elif self._time_period == TimePeriod.AFTER_TRADING:
                 if self._before_trading_processed:
                     self._before_trading_processed = False
                 if not self._after_trading_processed:
                     system_log.debug("VNPYEventSource: after trading event")
-                    yield Event(EVENT.AFTER_TRADING, datetime.now(), datetime.now())
+                    yield Event(EVENT.AFTER_TRADING, calendar_dt=datetime.now(), trading_dt=datetime.now())
                     self._after_trading_processed = True
                 else:
                     continue
