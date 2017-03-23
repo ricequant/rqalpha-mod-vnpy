@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 from dateutil.parser import parse
 from datetime import timedelta
+from six import iteritems
 
 from rqalpha.model.order import Order
 from rqalpha.model.trade import Trade
 from rqalpha.model.instrument import Instrument
+from rqalpha.model.position.future_position import FuturePosition
 from rqalpha.const import ORDER_STATUS, ORDER_TYPE, POSITION_EFFECT
 from .vnpy import EXCHANGE_SHFE, OFFSET_OPEN, OFFSET_CLOSETODAY, DIRECTION_SHORT, DIRECTION_LONG
 from .utils import SIDE_REVERSE
@@ -140,26 +142,31 @@ class RQVNTrade(Trade):
 
 class AccountCache(object):
     def __init__(self, data_cache):
-        self._account_dict = {
-            'orders': {},
-            'trades': [],
-            'portfolio': {
-                'positions': {}
-            }
-        }
+        # self._account_dict = {
+        #     'orders': {},
+        #     'trades': [],
+        #     'portfolio': {
+        #         'positions': {}
+        #     }
+        # }
+
+        self._position_cache = {}
 
         self._data_cache = data_cache
         self._buy_open_cost_cache = 0.
         self._sell_open_cost_cache = 0.
 
-    def put_vnpy_order(self, vnpy_order):
-        order = RQVNOrder(vnpy_order)
-        self._account_dict['orders'][order.order_id] = order
+    # def put_vnpy_order(self, vnpy_order):
+    #     order = RQVNOrder(vnpy_order)
+    #     self._account_dict['orders'][order.order_id] = order
 
     def put_vnpy_trade(self, vnpy_trade):
-        order = RQVNOrder.create_from_vnpy_trade__(vnpy_trade)
-        trade = RQVNTrade(vnpy_trade, order)
-        self._account_dict['trades'].append(trade)
+        order_book_id = _order_book_id(vnpy_trade.symbol)
+        if order_book_id not in self._position_cache:
+            self._position_cache[order_book_id] = {}
+        if 'trades' not in self._position_cache[order_book_id]:
+            self._position_cache[order_book_id]['trades'] = []
+            self._position_cache[order_book_id]['trades'].append(vnpy_trade)
 
     def put_vnpy_account(self, vnpy_account):
         if 'preBalance' in vnpy_account.__dict__:
@@ -167,57 +174,108 @@ class AccountCache(object):
 
     def put_vnpy_position(self, vnpy_position):
         order_book_id = _order_book_id(vnpy_position.symbol)
-        if order_book_id not in self._account_dict['portfolio']['positions']:
-            self._account_dict['portfolio']['positions'][order_book_id] = {}
+
+        if order_book_id not in self._position_cache:
+            self._position_cache[order_book_id] = {}
+
         if vnpy_position.direction == DIRECTION_LONG:
             if 'position' in vnpy_position.__dict__:
-                self._account_dict['portfolio']['positions'][order_book_id]['buy_quantity'] = vnpy_position.position
-                self._account_dict['portfolio']['positions'][order_book_id]['buy_today_quantity'] = \
-                    vnpy_position.position - vnpy_position.ydPosition
+                self._position_cache[order_book_id]['buy_old_quantity'] = vnpy_position.ydPosition
+                self._position_cache[order_book_id]['buy_today_quantity'] = vnpy_position.position - vnpy_position.ydPosition
             if 'commission' in vnpy_position.__dict__:
-                if 'buy_transaction_cost' not in self._account_dict['portfolio']['positions'][order_book_id]:
-                    self._account_dict['portfolio']['positions'][order_book_id]['buy_transaction_cost'] = 0.
-                self._account_dict['portfolio']['positions'][order_book_id][
-                    'buy_transaction_cost'] += vnpy_position.commission
+                if 'buy_transaction_cost' not in self._position_cache[order_book_id]:
+                    self._position_cache[order_book_id]['buy_transaction_cost'] = 0.
+                self._position_cache[order_book_id]['buy_transaction_cost'] += vnpy_position.commission
+            if 'closeProfit' in vnpy_position.__dict__:
+                if 'buy_realized_pnl' not in self._position_cache[order_book_id]:
+                    self._position_cache[order_book_id]['buy_realized_pnl'] = 0.
+                self._position_cache[order_book_id]['buy_realized_pnl'] += vnpy_position.closeProfit
             if 'openCost' in vnpy_position.__dict__:
                 self._buy_open_cost_cache += vnpy_position.openCost
                 contract_multiplier = self._data_cache.get_contract(vnpy_position.symbol)['size']
                 buy_quantity = self._account_dict['portfolio']['positions'][order_book_id]['buy_quantity']
-                buy_avg_open_price = self._buy_open_cost_cache / (buy_quantity * contract_multiplier) if buy_quantity != 0 else 0
-                self._account_dict['portfolio']['positions'][order_book_id]['buy_avg_open_price'] = buy_avg_open_price
-            if 'closeProfit' in vnpy_position.__dict__:
-                if 'buy_daily_realized_pnl' not in self._account_dict['portfolio']['positions'][order_book_id]:
-                    self._account_dict['portfolio']['positions'][order_book_id]['buy_daily_realized_pnl'] = 0.
-                self._account_dict['portfolio']['positions'][order_book_id][
-                    'buy_daily_realized_pnl'] += vnpy_position.closeProfit
+                self._position_cache[order_book_id]['buy_avg_open_price'] = self._buy_open_cost_cache / (buy_quantity * contract_multiplier) if buy_quantity != 0 else 0
 
         elif vnpy_position.direction == DIRECTION_SHORT:
             if 'position' in vnpy_position.__dict__:
-                if vnpy_position.position == 0:
-                    return
-                self._account_dict['portfolio']['positions'][order_book_id]['sell_quantity'] = vnpy_position.position
-                self._account_dict['portfolio']['positions'][order_book_id][
-                    'sell_today_quantity'] = vnpy_position.position - vnpy_position.ydPosition
+                self._position_cache[order_book_id]['sell_old_quantity'] = vnpy_position.ydPosition
+                self._position_cache[order_book_id]['sell_today_quantity'] = vnpy_position.position - vnpy_position.ydPosition
             if 'commission' in vnpy_position.__dict__:
-                if 'sell_transaction_cost' not in self._account_dict['portfolio']['positions'][order_book_id]:
-                    self._account_dict['portfolio']['positions'][order_book_id]['sell_transaction_cost'] = 0.
-                self._account_dict['portfolio']['positions'][order_book_id][
-                    'sell_transaction_cost'] += vnpy_position.commission
+                if 'sell_transaction_cost' not in self._position_cache[order_book_id]:
+                    self._position_cache[order_book_id]['sell_transaction_cost'] = 0.
+                self._position_cache[order_book_id]['sell_transaction_cost'] += vnpy_position.commission
+            if 'closeProfit' in vnpy_position.__dict__:
+                if 'sell_realized_pnl' not in self._position_cache[order_book_id]:
+                    self._position_cache[order_book_id]['sell_realized_pnl'] = 0.
+                self._position_cache[order_book_id]['sell_realized_pnl'] += vnpy_position.closeProfit
             if 'openCost' in vnpy_position.__dict__:
                 self._sell_open_cost_cache += vnpy_position.openCost
                 contract_multiplier = self._data_cache.get_contract(vnpy_position.symbol)['size']
                 sell_quantity = self._account_dict['portfolio']['positions'][order_book_id]['sell_quantity']
-                sell_avg_open_price = self._sell_open_cost_cache / (sell_quantity * contract_multiplier)
-                self._account_dict['portfolio']['positions'][order_book_id]['buy_avg_open_price'] = sell_avg_open_price
-            if 'closeProfit' in vnpy_position.__dict__:
-                if 'sell_daily_realized_pnl' not in self._account_dict['portfolio']['positions'][order_book_id]:
-                    self._account_dict['portfolio']['positions'][order_book_id]['sell_daily_realized_pnl'] = 0.
-                self._account_dict['portfolio']['positions'][order_book_id][
-                    'sell_daily_realized_pnl'] += vnpy_position.closeProfit
+                self._position_cache[order_book_id]['sell_avg_open_price'] = self._sell_open_cost_cache / (sell_quantity * contract_multiplier) if sell_quantity != 0 else 0
 
         if 'preSettlementPrice' in vnpy_position.__dict__:
-            self._account_dict['portfolio']['positions'][order_book_id][
-                'prev_settle_price'] = vnpy_position.preSettlementPrice
+            self._position_cache[order_book_id]['prev_settle_price'] = vnpy_position.preSettlementPrice
+
+    def make_positions(self):
+        positions = {}
+        for order_book_id, position_dict in iteritems(self._position_cache):
+            position = FuturePosition(order_book_id)
+            if 'prev_settle_price' in position_dict and 'buy_old_quantity' in position_dict:
+                position._buy_old_holding_list = [(position_dict['prev_settle_price'], position_dict['buy_old_quantity'])]
+            if 'prev_settle_price' in position_dict and 'sell_old_quantity' in position_dict:
+                position._sell_old_holding_list = [(position_dict['prev_settle_price'], position_dict['sell_old_quantity'])]
+
+            if 'buy_transaction_cost' in position_dict:
+                position._buy_transaction_cost = position_dict['buy_transaction_cost']
+            if 'sell_transaction_cost' in position_dict:
+                position._sell_transaction_cost = position_dict['sell_transaction_cost']
+            if 'buy_realized_pnl' in position_dict:
+                position.__buy_realized_pnl = position_dict['buy_realized_pnl']
+            if 'sell_realized_pnl' in position_dict:
+                position._sell_realized_pnl = position_dict['sell_realized_pnl']
+
+            if 'buy_avg_open_price' in position_dict:
+                position._buy_avg_open_price = position_dict['buy_avg_open_price']
+            if 'sell_avg_open_price' in position_dict:
+                position._sell_avg_open_price = position_dict['sell_avg_open_price']
+
+            if 'trades' in position_dict:
+                accum_buy_open_quantity = 0.
+                accum_sell_open_quantity = 0.
+
+                buy_today_quantity = position_dict['buy_today_quantity'] if 'buy_today_quantity' in position_dict else 0
+                sell_today_quantity = position_dict['sell_today_quantity'] if 'sell_today_quantity' in position_dict else 0
+
+                trades = sorted(position_dict['trades'], key=lambda t: parse(t.tradeTime), reverse=True)
+
+                buy_today_holding_list = []
+                sell_today_holding_list = []
+                for vnpy_trade in trades:
+                    if vnpy_trade.direction == DIRECTION_LONG:
+                        if vnpy_trade.offset == OFFSET_OPEN:
+                            accum_buy_open_quantity += vnpy_trade.volume
+                            if accum_buy_open_quantity == buy_today_quantity:
+                                break
+                            if accum_buy_open_quantity > buy_today_quantity:
+                                buy_today_holding_list.append((vnpy_trade.price, buy_today_quantity - accum_buy_open_quantity + vnpy_trade.volume))
+                                break
+                            buy_today_holding_list.append((vnpy_trade.price, vnpy_trade.volume))
+                    else:
+                        if vnpy_trade.offset == OFFSET_OPEN:
+                            accum_sell_open_quantity += vnpy_trade.volume
+                            if accum_sell_open_quantity == sell_today_quantity:
+                                break
+                            if accum_sell_open_quantity > sell_today_quantity:
+                                sell_today_holding_list.append((vnpy_trade.price, sell_today_quantity - accum_sell_open_quantity + vnpy_trade.volume))
+                                break
+                            sell_today_holding_list.append((vnpy_trade.price, vnpy_trade.volume))
+
+                position._buy_today_holding_list = buy_today_holding_list
+                position._sell_today_holding_list = sell_today_holding_list
+
+            positions[order_book_id] = position
+        return positions
 
     @property
     def account_dict(self):
