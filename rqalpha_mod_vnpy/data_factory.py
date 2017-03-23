@@ -6,9 +6,12 @@ from six import iteritems
 from rqalpha.model.order import Order
 from rqalpha.model.trade import Trade
 from rqalpha.model.instrument import Instrument
-from rqalpha.model.position.future_position import FuturePosition
+from rqalpha.model.position.future_position import FuturePosition, margin_of
+from rqalpha.model.acount.future_account import FutureAccount
 from rqalpha.const import ORDER_STATUS, ORDER_TYPE, POSITION_EFFECT
 from .vnpy import EXCHANGE_SHFE, OFFSET_OPEN, OFFSET_CLOSETODAY, DIRECTION_SHORT, DIRECTION_LONG
+from .vnpy import STATUS_NOTTRADED, STATUS_PARTTRADED, STATUS_ALLTRADED, STATUS_CANCELLED, STATUS_UNKNOWN, CURRENCY_CNY, PRODUCT_FUTURES
+
 from .utils import SIDE_REVERSE
 
 
@@ -142,23 +145,17 @@ class RQVNTrade(Trade):
 
 class AccountCache(object):
     def __init__(self, data_cache):
-        # self._account_dict = {
-        #     'orders': {},
-        #     'trades': [],
-        #     'portfolio': {
-        #         'positions': {}
-        #     }
-        # }
-
+        self._account_cache = {}
         self._position_cache = {}
+
+        self._order_cache = []
 
         self._data_cache = data_cache
         self._buy_open_cost_cache = 0.
         self._sell_open_cost_cache = 0.
 
-    # def put_vnpy_order(self, vnpy_order):
-    #     order = RQVNOrder(vnpy_order)
-    #     self._account_dict['orders'][order.order_id] = order
+    def put_vnpy_order(self, vnpy_order):
+        self._order_cache.append(vnpy_order)
 
     def put_vnpy_trade(self, vnpy_trade):
         order_book_id = _order_book_id(vnpy_trade.symbol)
@@ -166,11 +163,11 @@ class AccountCache(object):
             self._position_cache[order_book_id] = {}
         if 'trades' not in self._position_cache[order_book_id]:
             self._position_cache[order_book_id]['trades'] = []
-            self._position_cache[order_book_id]['trades'].append(vnpy_trade)
+        self._position_cache[order_book_id]['trades'].append(vnpy_trade)
 
     def put_vnpy_account(self, vnpy_account):
         if 'preBalance' in vnpy_account.__dict__:
-            self._account_dict['portfolio']['yesterday_portfolio_value'] = vnpy_account.preBalance
+            self._account_cache['yesterday_portfolio_value'] = vnpy_account.preBalance
 
     def put_vnpy_position(self, vnpy_position):
         order_book_id = _order_book_id(vnpy_position.symbol)
@@ -217,7 +214,7 @@ class AccountCache(object):
         if 'preSettlementPrice' in vnpy_position.__dict__:
             self._position_cache[order_book_id]['prev_settle_price'] = vnpy_position.preSettlementPrice
 
-    def make_positions(self):
+    def _make_positions(self):
         positions = {}
         for order_book_id, position_dict in iteritems(self._position_cache):
             position = FuturePosition(order_book_id)
@@ -276,6 +273,21 @@ class AccountCache(object):
 
             positions[order_book_id] = position
         return positions
+
+    def make_account(self):
+        total_cash = self._account_cache['yesterday_portfolio_value']
+        positions = self._make_positions()
+
+        account = FutureAccount(total_cash, positions)
+        frozen_cash = 0.
+        for vnpy_order in self._order_cache:
+            if vnpy_order.status == STATUS_NOTTRADED or vnpy_order.status == STATUS_PARTTRADED:
+                order_book_id = _order_book_id(vnpy_order.symbol)
+                unfilled_quantity = vnpy_order.totalVolume - vnpy_order.tradedVolume
+                price = vnpy_order.price
+                frozen_cash += margin_of(order_book_id, unfilled_quantity, price)
+        account._frozen_cash = frozen_cash
+        return account
 
     @property
     def account_dict(self):

@@ -10,7 +10,6 @@ from .vnpy import EventEngine2
 
 EVENT_POSITION_EXTRA = 'ePositionExtra'
 EVENT_CONTRACT_EXTRA = 'eContractExtra'
-EVENT_ACCOUNT_EXTRA = 'eAccountExtra'
 EVENT_COMMISSION = 'eCommission'
 EVENT_INIT_ACCOUNT = 'eAccountInit'
 
@@ -54,16 +53,6 @@ class CommissionData(VtBaseData):
         self.CloseTodayRatioByVolume = EMPTY_FLOAT
 
 
-class AccountExtra(VtBaseData):
-    def __init__(self):
-        super(AccountExtra, self).__init__()
-
-        self.accountID = EMPTY_STRING
-        self.vtAccountID = EMPTY_STRING
-
-        self.preBalance = EMPTY_FLOAT
-
-
 # ------------------------------------ 扩展事件引擎 ------------------------------------
 class RQVNEventEngine(EventEngine2):
     def __init__(self):
@@ -91,13 +80,6 @@ class RQCTPTdApi(CtpTdApi):
 
     def onRspQryTradingAccount(self, data, error, n, last):
         super(RQCTPTdApi, self).onRspQryTradingAccount(data, error, n, last)
-
-        accountExtra = AccountExtra()
-        accountExtra.accountID = data['AccountID']
-        accountExtra.vtAccountID = '.'.join([self.gatewayName, accountExtra.accountID])
-
-        accountExtra.preBalance = data['PreBalance']
-        self.gateway.onAccountExtra(accountExtra)
 
         self.gateway.status.account_success()
 
@@ -226,11 +208,6 @@ class RQVNCTPGateway(CtpGateway):
     def onContractExtra(self, contractExtra):
         event = Event(type_=EVENT_CONTRACT_EXTRA)
         event.dict_['data'] = contractExtra
-        self.eventEngine.put(event)
-
-    def onAccountExtra(self, accountExtra):
-        event = Event(type_=EVENT_ACCOUNT_EXTRA)
-        event.dict_['data'] = accountExtra
         self.eventEngine.put(event)
 
     def onCommission(self, commissionData):

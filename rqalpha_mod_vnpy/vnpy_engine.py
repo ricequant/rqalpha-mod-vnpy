@@ -260,17 +260,11 @@ class RQVNPYEngine(object):
         if not self._account_inited:
             self._account_cache.put_vnpy_position(vnpy_position_extra)
 
-    # def on_account(self, event):
-    #     vnpy_account = event.dict_['data']
-    #     system_log.debug("on_account {}", vnpy_account.__dict__)
-    #     if not self._account_inited:
-    #         self._account_cache.put_vnpy_account(vnpy_account)
-
-    def on_account_extra(self, event):
-        vnpy_account_extra = event.dict_['data']
-        system_log.debug("on_account_extra {}", vnpy_account_extra.__dict__)
+    def on_account(self, event):
+        vnpy_account = event.dict_['data']
+        system_log.debug("on_account {}", vnpy_account.__dict__)
         if not self._account_inited:
-            self._account_cache.put_vnpy_account(vnpy_account_extra)
+            self._account_cache.put_vnpy_account(vnpy_account)
 
     # ------------------------------------ gateway 和 event engine生命周期 ------------------------------------
     def _init_gateway(self):
@@ -289,25 +283,15 @@ class RQVNPYEngine(object):
     def connect(self):
         self.vnpy_gateway.connect_and_init_contract()
 
-    def init_account(self):
+    def init_account(self, block=False):
         self.vnpy_gateway.init_account()
+        if block:
+            while not self._account_inited:
+                continue
 
     def on_init_account(self, event):
-        account_dict = self._account_cache.account_dict
-        if 'units' not in account_dict['portfolio']:
-            account_dict['portfolio']['units'] = self._env.config.base.future_starting_cash
-        if 'yesterday_units' not in account_dict['portfolio']:
-            account_dict['portfolio']['yesterday_units'] = self._env.config.base.future_starting_cash
-
-        self.accounts[ACCOUNT_TYPE.FUTURE] = FutureAccount.from_recovery(self._env,
-                                                                         self._env.config.base.future_starting_cash,
-                                                                         self._env.config.base.start_date,
-                                                                         self._account_cache.account_dict)
+        self.accounts[ACCOUNT_TYPE.FUTURE] = self._account_cache.make_account()
         self._account_inited = True
-
-    def wait_until_account_inited(self):
-        while not self._account_inited:
-            continue
 
     def exit(self):
         self.vnpy_gateway.close()
@@ -319,12 +303,11 @@ class RQVNPYEngine(object):
         self.event_engine.register(EVENT_TRADE, self.on_trade)
         self.event_engine.register(EVENT_TICK, self.on_tick)
         self.event_engine.register(EVENT_LOG, self.on_log)
-        # self.event_engine.register(EVENT_ACCOUNT, self.on_account)
+        self.event_engine.register(EVENT_ACCOUNT, self.on_account)
         self.event_engine.register(EVENT_POSITION, self.on_positions)
         self.event_engine.register(EVENT_POSITION_EXTRA, self.on_position_extra)
         self.event_engine.register(EVENT_CONTRACT_EXTRA, self.on_contract_extra)
         self.event_engine.register(EVENT_COMMISSION, self.on_commission)
-        self.event_engine.register(EVENT_ACCOUNT_EXTRA, self.on_account_extra)
         self.event_engine.register(EVENT_INIT_ACCOUNT, self.on_init_account)
 
         self._env.event_bus.add_listener(EVENT.POST_UNIVERSE_CHANGED, self.on_universe_changed)
