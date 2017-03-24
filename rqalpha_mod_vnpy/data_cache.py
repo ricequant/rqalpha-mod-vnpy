@@ -1,7 +1,7 @@
 from rqalpha.utils.logger import system_log
 from rqalpha.const import COMMISSION_TYPE, MARGIN_TYPE
 
-from .utils import symbol_2_order_book_id
+from .data_factory import DataFactory
 
 
 def _underlying_symbol(id_or_symgol):
@@ -42,7 +42,7 @@ class DataCache(object):
             self._contract_cache[symbol] = contract_or_extra.__dict__
         else:
             self._contract_cache[symbol].update(contract_or_extra.__dict__)
-        order_book_id = symbol_2_order_book_id(symbol)
+        order_book_id = DataFactory.make_order_book_id(symbol)
         self._order_book_id_symbol_map[order_book_id] = symbol
         if 'longMarginRatio' in contract_or_extra.__dict__:
             underlying_symbol = _underlying_symbol(order_book_id)

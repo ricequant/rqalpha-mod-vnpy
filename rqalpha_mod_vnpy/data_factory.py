@@ -3,149 +3,15 @@ from dateutil.parser import parse
 from datetime import timedelta
 from six import iteritems
 
-from rqalpha.model.order import Order
+from rqalpha.model.order import Order, LimitOrder
 from rqalpha.model.trade import Trade
-from rqalpha.model.instrument import Instrument
-from rqalpha.model.position import Positions,FuturePosition
+from rqalpha.model.position import Positions
 from rqalpha.model.position.future_position import FuturePosition
 from rqalpha.model.account.future_account import FutureAccount, margin_of
-from rqalpha.const import ORDER_STATUS, ORDER_TYPE, POSITION_EFFECT
+from rqalpha.environment import Environment
+from rqalpha.const import ORDER_STATUS, HEDGE_TYPE, POSITION_EFFECT, COMMISSION_TYPE, SIDE
 from .vnpy import EXCHANGE_SHFE, OFFSET_OPEN, OFFSET_CLOSETODAY, DIRECTION_SHORT, DIRECTION_LONG
 from .vnpy import STATUS_NOTTRADED, STATUS_PARTTRADED
-
-from .utils import SIDE_REVERSE, symbol_2_order_book_id
-
-
-def _trading_dt(calendar_dt):
-    if calendar_dt.hour > 20:
-        return calendar_dt + timedelta(days=1)
-    return calendar_dt
-
-
-class RQVNInstrument(Instrument):
-    def __init__(self, vnpy_contract):
-        # TODO：从 rqalpha data bundle 中读取数据，补充字段
-        listed_date = vnpy_contract.get('openDate')
-        de_listed_date = vnpy_contract.get('expireDate')
-
-        if listed_date is not None:
-            listed_date = '%s-%s-%s' % (listed_date[:4], listed_date[4:6], listed_date[6:])
-        else:
-            listed_date = '0000-00-00'
-
-        if de_listed_date is not None:
-            de_listed_date = '%s-%s-%s' % (de_listed_date[:4], de_listed_date[4:6], de_listed_date[6:])
-        else:
-            de_listed_date = '0000-00-00'
-
-        dic = {
-            'order_book_id': symbol_2_order_book_id(vnpy_contract.get('symbol')),
-            'exchange': vnpy_contract.get('exchange'),
-            'symbol': vnpy_contract.get('name'),
-            'contract_multiplier': vnpy_contract.get('size'),
-            'trading_unit': vnpy_contract.get('priceTick'),
-            'type': 'Future',
-            'margin_rate': vnpy_contract.get('longMarginRatio'),
-            'listed_date': listed_date,
-            'de_listed_date': de_listed_date,
-            'maturity_date': de_listed_date,
-        }
-
-        super(RQVNInstrument, self).__init__(dic)
-
-
-class RQVNOrder(Order):
-    def __init__(self, vnpy_order=None):
-        super(RQVNOrder, self).__init__()
-        if vnpy_order is None:
-            return
-        self._order_id = next(self.order_id_gen)
-        self._calendar_dt = parse(vnpy_order.orderTime)
-        self._trading_dt = _trading_dt(self._calendar_dt)
-        self._quantity = vnpy_order.totalVolume
-        self._order_book_id = symbol_2_order_book_id(vnpy_order.symbol)
-        self._side = SIDE_REVERSE[vnpy_order.direction]
-
-        if vnpy_order.exchange == EXCHANGE_SHFE:
-            if vnpy_order.offset == OFFSET_OPEN:
-                self._position_effect = POSITION_EFFECT.OPEN
-            elif vnpy_order.offset == OFFSET_CLOSETODAY:
-                self._position_effect = POSITION_EFFECT.CLOSE_TODAY
-            else:
-                self._position_effect = POSITION_EFFECT.CLOSE
-        else:
-            if vnpy_order.offset == OFFSET_OPEN:
-                self._position_effect = POSITION_EFFECT.OPEN
-            else:
-                self._position_effect = POSITION_EFFECT.CLOSE
-
-        self._message = ""
-        self._filled_quantity = vnpy_order.tradedVolume
-        self._status = ORDER_STATUS.PENDING_NEW
-        # hard code VNPY 封装的报单类型中省掉了 type 字段
-        self._type = ORDER_TYPE.LIMIT
-        self._frozen_price = vnpy_order.price
-        self._type = ORDER_TYPE.LIMIT
-        self._avg_price = 0
-        self._transaction_cost = 0
-
-    @classmethod
-    def create_from_vnpy_trade__(cls, vnpy_trade):
-        order = cls()
-        order._order_id = next(order.order_id_gen)
-        order._calendar_dt = parse(vnpy_trade.tradeTime)
-        order._trading_dt = _trading_dt(order._calendar_dt)
-        order._order_book_id = symbol_2_order_book_id(vnpy_trade.symbol)
-        order._quantity = vnpy_trade.volume
-        order._side = SIDE_REVERSE[vnpy_trade.direction]
-
-        if vnpy_trade.exchange == EXCHANGE_SHFE:
-            if vnpy_trade.offset == OFFSET_OPEN:
-                order._position_effect = POSITION_EFFECT.OPEN
-            elif vnpy_trade.offset == OFFSET_CLOSETODAY:
-                order._position_effect = POSITION_EFFECT.CLOSE_TODAY
-            else:
-                order._position_effect = POSITION_EFFECT.CLOSE
-        else:
-            if vnpy_trade.offset == OFFSET_OPEN:
-                order._position_effect = POSITION_EFFECT.OPEN
-            else:
-                order._position_effect = POSITION_EFFECT.CLOSE
-
-        order._message = ""
-        order._filled_quantity = vnpy_trade.volume
-        order._status = ORDER_STATUS.FILLED
-        order._type = ORDER_TYPE.LIMIT
-        order._avg_price = vnpy_trade.price
-        order._transaction_cost = 0
-        return order
-
-
-class RQVNTrade(Trade):
-    def __init__(self, vnpy_trade, order):
-        super(RQVNTrade, self).__init__()
-        self._order_book_id = symbol_2_order_book_id(vnpy_trade.symbol)
-        self._calendar_dt = parse(vnpy_trade.tradeTime)
-        self._trading_dt = _trading_dt(self._calendar_dt)
-        self._price = vnpy_trade.price
-        self._frozen_price = vnpy_trade.price
-        self._amount = vnpy_trade.volume
-        self._order = order
-        self._tax = 0.
-        self._trade_id = next(self.trade_id_gen)
-        self._close_today_amount = 0.
-        if vnpy_trade.exchange == EXCHANGE_SHFE:
-            if vnpy_trade.offset == OFFSET_OPEN:
-                self._position_effect = POSITION_EFFECT.OPEN
-            elif vnpy_trade.offset == OFFSET_CLOSETODAY:
-                self._position_effect = POSITION_EFFECT.CLOSE_TODAY
-            else:
-                self._position_effect = POSITION_EFFECT.CLOSE
-        else:
-            if vnpy_trade.offset == OFFSET_OPEN:
-                self._position_effect = POSITION_EFFECT.OPEN
-            else:
-                self._position_effect = POSITION_EFFECT.CLOSE
 
 
 class AccountCache(object):
@@ -163,7 +29,7 @@ class AccountCache(object):
         self._order_cache.append(vnpy_order)
 
     def put_vnpy_trade(self, vnpy_trade):
-        order_book_id = symbol_2_order_book_id(vnpy_trade.symbol)
+        order_book_id = DataFactory.make_order_book_id(vnpy_trade.symbol)
         if order_book_id not in self._position_cache:
             self._position_cache[order_book_id] = {}
         if 'trades' not in self._position_cache[order_book_id]:
@@ -175,7 +41,7 @@ class AccountCache(object):
             self._account_cache['yesterday_portfolio_value'] = vnpy_account.preBalance
 
     def put_vnpy_position(self, vnpy_position):
-        order_book_id = symbol_2_order_book_id(vnpy_position.symbol)
+        order_book_id = DataFactory.make_order_book_id(vnpy_position.symbol)
 
         if order_book_id not in self._position_cache:
             self._position_cache[order_book_id] = {}
@@ -289,9 +155,118 @@ class AccountCache(object):
         frozen_cash = 0.
         for vnpy_order in self._order_cache:
             if vnpy_order.status == STATUS_NOTTRADED or vnpy_order.status == STATUS_PARTTRADED:
-                order_book_id = symbol_2_order_book_id(vnpy_order.symbol)
+                order_book_id = DataFactory.make_order_book_id(vnpy_order.symbol)
                 unfilled_quantity = vnpy_order.totalVolume - vnpy_order.tradedVolume
                 price = vnpy_order.price
                 frozen_cash += margin_of(order_book_id, unfilled_quantity, price)
         account._frozen_cash = frozen_cash
         return account
+
+
+class DataFactory(object):
+    SIDE_REVERSE = {
+        DIRECTION_LONG: SIDE.BUY,
+        DIRECTION_SHORT: SIDE.SELL,
+    }
+
+    def __init__(self):
+        pass
+
+    @classmethod
+    def make_trading_dt(cls, calendar_dt):
+        # FIXME: 替换为 next_trading_date
+        if calendar_dt.hour > 20:
+            return calendar_dt + timedelta(days=1)
+        return calendar_dt
+
+    @classmethod
+    def make_position_effect(cls, vnpy_exchange, vnpy_offset):
+        if vnpy_exchange == EXCHANGE_SHFE:
+            if vnpy_offset == OFFSET_OPEN:
+                return POSITION_EFFECT.OPEN
+            elif vnpy_offset == OFFSET_CLOSETODAY:
+                return POSITION_EFFECT.CLOSE_TODAY
+            else:
+                return POSITION_EFFECT.CLOSE
+        else:
+            if vnpy_offset == OFFSET_OPEN:
+                return POSITION_EFFECT.OPEN
+            else:
+                return POSITION_EFFECT.CLOSE
+
+    @classmethod
+    def make_order_book_id(cls, symbol):
+        if len(symbol) < 4:
+            return None
+        if symbol[-4] not in '0123456789':
+            order_book_id = symbol[:2] + '1' + symbol[-3:]
+        else:
+            order_book_id = symbol
+        return order_book_id.upper()
+
+    @classmethod
+    def make_order(cls, vnpy_order):
+        calendar_dt = parse(vnpy_order.orderTime)
+        trading_dt = cls.make_trading_dt(calendar_dt)
+        order_book_id = cls.make_order_book_id(vnpy_order.symbol)
+        quantity = vnpy_order.totalVolume
+        side = cls.SIDE_REVERSE[vnpy_order.direction]
+        style = LimitOrder(vnpy_order.price)
+        position_effect = cls.make_position_effect(vnpy_order.exchange, vnpy_order.offset)
+
+        order = Order.__from_create__(calendar_dt, trading_dt, order_book_id, quantity, side, style, position_effect)
+        order._filled_quantity = vnpy_order.totalVolume
+
+        return order
+
+    @classmethod
+    def make_order_from_vnpy_trade(cls, vnpy_trade):
+        calendar_dt = parse(vnpy_trade.tradeTime)
+        trading_dt = cls.make_trading_dt(calendar_dt)
+        order_book_id = cls.make_order_book_id(vnpy_trade.symbol)
+        quantity = vnpy_trade.volume
+        side = cls.SIDE_REVERSE[vnpy_trade.direction]
+        style = LimitOrder(vnpy_trade.price)
+        position_effect = cls.make_position_effect(vnpy_trade.exchange, vnpy_trade.offset)
+
+        order = Order.__from_create__(calendar_dt, trading_dt, order_book_id, quantity, side, style, position_effect)
+        order._filled_quantity = vnpy_trade.volume
+        order._status = ORDER_STATUS.FILLED
+        order._avg_price = vnpy_trade.price
+        # FIXME: 用近似值代替
+        order._transaction_cost = 0
+        return order
+
+    @classmethod
+    def get_commission(cls, order_book_id, position_effect, price, amount, hedge_type=HEDGE_TYPE.SPECULATION):
+        info = Environment.get_instance().get_future_commission_info(order_book_id, hedge_type)
+        commission = 0
+        if info['commission_type'] == COMMISSION_TYPE.BY_MONEY:
+            contract_multiplier = Environment.get_instance().get_instrument(order_book_id).contract_multiplier
+            if position_effect == POSITION_EFFECT.OPEN:
+                commission += price * amount * contract_multiplier * info['open_commission_ratio']
+            else:
+                commission += price * amount * contract_multiplier * info['close_commission_ratio']
+        else:
+            if position_effect == POSITION_EFFECT.OPEN:
+                commission += amount * info['open_commission_ratio']
+            else:
+                commission += amount * info['close_commission_ratio']
+        return commission
+
+    @classmethod
+    def make_trade(cls, vnpy_trade, order_id=None):
+        order_id = order_id if order_id is not None else next(Order.order_id_gen)
+        calendar_dt = parse(vnpy_trade.tradeTime)
+        trading_dt = cls.make_trading_dt(calendar_dt)
+        price = vnpy_trade.price
+        amount = vnpy_trade.volume
+        side = cls.SIDE_REVERSE[vnpy_trade.direction]
+        position_effect = cls.make_position_effect(vnpy_trade.exchange, vnpy_trade.offset)
+        order_book_id = cls.make_order_book_id(vnpy_trade.symbol)
+        commission = cls.get_commission(order_book_id, position_effect, price, amount)
+        frozen_price = vnpy_trade.price
+
+        return Trade.__from_create__(
+            order_id, calendar_dt, trading_dt, price, amount, side, position_effect,  order_book_id,
+            commission=commission, frozen_price=frozen_price)
