@@ -12,23 +12,13 @@ from rqalpha.const import ORDER_STATUS, ORDER_TYPE, POSITION_EFFECT
 from .vnpy import EXCHANGE_SHFE, OFFSET_OPEN, OFFSET_CLOSETODAY, DIRECTION_SHORT, DIRECTION_LONG
 from .vnpy import STATUS_NOTTRADED, STATUS_PARTTRADED
 
-from .utils import SIDE_REVERSE
+from .utils import SIDE_REVERSE, symbol_2_order_book_id
 
 
 def _trading_dt(calendar_dt):
     if calendar_dt.hour > 20:
         return calendar_dt + timedelta(days=1)
     return calendar_dt
-
-
-def _order_book_id(symbol):
-    if len(symbol) < 4:
-        return None
-    if symbol[-4] not in '0123456789':
-        order_book_id = symbol[:2] + '1' + symbol[-3:]
-    else:
-        order_book_id = symbol
-    return order_book_id.upper()
 
 
 class RQVNInstrument(Instrument):
@@ -48,7 +38,7 @@ class RQVNInstrument(Instrument):
             de_listed_date = '0000-00-00'
 
         dic = {
-            'order_book_id': _order_book_id(vnpy_contract.get('symbol')),
+            'order_book_id': symbol_2_order_book_id(vnpy_contract.get('symbol')),
             'exchange': vnpy_contract.get('exchange'),
             'symbol': vnpy_contract.get('name'),
             'contract_multiplier': vnpy_contract.get('size'),
@@ -72,7 +62,7 @@ class RQVNOrder(Order):
         self._calendar_dt = parse(vnpy_order.orderTime)
         self._trading_dt = _trading_dt(self._calendar_dt)
         self._quantity = vnpy_order.totalVolume
-        self._order_book_id = _order_book_id(vnpy_order.symbol)
+        self._order_book_id = symbol_2_order_book_id(vnpy_order.symbol)
         self._side = SIDE_REVERSE[vnpy_order.direction]
 
         if vnpy_order.exchange == EXCHANGE_SHFE:
@@ -104,7 +94,7 @@ class RQVNOrder(Order):
         order._order_id = next(order.order_id_gen)
         order._calendar_dt = parse(vnpy_trade.tradeTime)
         order._trading_dt = _trading_dt(order._calendar_dt)
-        order._order_book_id = _order_book_id(vnpy_trade.symbol)
+        order._order_book_id = symbol_2_order_book_id(vnpy_trade.symbol)
         order._quantity = vnpy_trade.volume
         order._side = SIDE_REVERSE[vnpy_trade.direction]
 
@@ -158,7 +148,7 @@ class AccountCache(object):
         self._order_cache.append(vnpy_order)
 
     def put_vnpy_trade(self, vnpy_trade):
-        order_book_id = _order_book_id(vnpy_trade.symbol)
+        order_book_id = symbol_2_order_book_id(vnpy_trade.symbol)
         if order_book_id not in self._position_cache:
             self._position_cache[order_book_id] = {}
         if 'trades' not in self._position_cache[order_book_id]:
@@ -170,7 +160,7 @@ class AccountCache(object):
             self._account_cache['yesterday_portfolio_value'] = vnpy_account.preBalance
 
     def put_vnpy_position(self, vnpy_position):
-        order_book_id = _order_book_id(vnpy_position.symbol)
+        order_book_id = symbol_2_order_book_id(vnpy_position.symbol)
 
         if order_book_id not in self._position_cache:
             self._position_cache[order_book_id] = {}
@@ -284,7 +274,7 @@ class AccountCache(object):
         frozen_cash = 0.
         for vnpy_order in self._order_cache:
             if vnpy_order.status == STATUS_NOTTRADED or vnpy_order.status == STATUS_PARTTRADED:
-                order_book_id = _order_book_id(vnpy_order.symbol)
+                order_book_id = symbol_2_order_book_id(vnpy_order.symbol)
                 unfilled_quantity = vnpy_order.totalVolume - vnpy_order.tradedVolume
                 price = vnpy_order.price
                 frozen_cash += margin_of(order_book_id, unfilled_quantity, price)

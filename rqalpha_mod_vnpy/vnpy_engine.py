@@ -17,7 +17,7 @@ from .vnpy import STATUS_NOTTRADED, STATUS_PARTTRADED, STATUS_ALLTRADED, STATUS_
 from .vnpy_gateway import EVENT_POSITION_EXTRA, EVENT_CONTRACT_EXTRA, EVENT_COMMISSION, EVENT_INIT_ACCOUNT
 from .vnpy_gateway import RQVNEventEngine
 from .data_factory import RQVNOrder, RQVNTrade, AccountCache
-from .utils import SIDE_MAPPING, ORDER_TYPE_MAPPING, POSITION_EFFECT_MAPPING
+from .utils import SIDE_MAPPING, ORDER_TYPE_MAPPING, POSITION_EFFECT_MAPPING, symbol_2_order_book_id
 
 _engine = None
 
@@ -132,7 +132,7 @@ class RQVNPYEngine(object):
     def on_trade(self, event):
         vnpy_trade = event.dict_['data']
         system_log.debug("on_trade {}", vnpy_trade.__dict__)
-        order_book_id = self._data_cache.get_order_book_id(vnpy_trade.symbol)
+        order_book_id = symbol_2_order_book_id(vnpy_trade.symbol)
         future_info = self._data_cache.get_future_info(order_book_id)
         if future_info is None or ['open_commission_ratio'] not in future_info:
             self.vnpy_gateway.put_query(self.vnpy_gateway.qryCommission,
@@ -191,7 +191,7 @@ class RQVNPYEngine(object):
     def on_tick(self, event):
         vnpy_tick = event.dict_['data']
         system_log.debug("on_tick {}", vnpy_tick.__dict__)
-        order_book_id = self._data_cache.get_order_book_id(vnpy_tick.symbol)
+        order_book_id = symbol_2_order_book_id(vnpy_tick.symbol)
         tick = {
             'order_book_id': order_book_id,
             'datetime': parse('%s %s' % (vnpy_tick.date, vnpy_tick.time)),

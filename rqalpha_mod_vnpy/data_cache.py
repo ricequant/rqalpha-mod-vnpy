@@ -1,15 +1,7 @@
 from rqalpha.utils.logger import system_log
 from rqalpha.const import COMMISSION_TYPE, MARGIN_TYPE
 
-
-def _order_book_id(symbol):
-    if len(symbol) < 4:
-        return None
-    if symbol[-4] not in '0123456789':
-        order_book_id = symbol[:2] + '1' + symbol[-3:]
-    else:
-        order_book_id = symbol
-    return order_book_id.upper()
+from .utils import symbol_2_order_book_id
 
 
 def _underlying_symbol(id_or_symgol):
@@ -23,7 +15,6 @@ class DataCache(object):
         self._open_order_dict = {}
 
         self._order_book_id_symbol_map = {}
-        self._symbol_order_book_id_map = {}
 
         self._contract_dict = {}
         self._contract_cache = {}
@@ -31,16 +22,6 @@ class DataCache(object):
         self._tick_snapshot_dict = {}
 
         self._future_info_cache = {}
-
-    @staticmethod
-    def _order_book_id(symbol):
-        if len(symbol) < 4:
-            return None
-        if symbol[-4] not in '0123456789':
-            order_book_id = symbol[:2] + '1' + symbol[-3:]
-        else:
-            order_book_id = symbol
-        return order_book_id.upper()
 
     @property
     def open_orders(self):
@@ -61,9 +42,8 @@ class DataCache(object):
             self._contract_cache[symbol] = contract_or_extra.__dict__
         else:
             self._contract_cache[symbol].update(contract_or_extra.__dict__)
-        order_book_id = _order_book_id(symbol)
+        order_book_id = symbol_2_order_book_id(symbol)
         self._order_book_id_symbol_map[order_book_id] = symbol
-        self._symbol_order_book_id_map[symbol] = order_book_id
         if 'longMarginRatio' in contract_or_extra.__dict__:
             underlying_symbol = _underlying_symbol(order_book_id)
             if underlying_symbol not in self._future_info_cache:
@@ -114,9 +94,6 @@ class DataCache(object):
         if vnpy_order_id in self._open_order_dict:
             del self._open_order_dict[vnpy_order_id]
 
-    def get_order_book_id(self, symbol):
-        return _order_book_id(symbol)
-
     def get_symbol(self, order_book_id):
         return self._order_book_id_symbol_map.get(order_book_id)
 
@@ -157,5 +134,3 @@ class DataCache(object):
             system_log.error('Cannot find such tick whose order_book_id is {} ', order_book_id)
             return None
 
-    def get_all_contract_dict(self):
-        return self._contract_cache
