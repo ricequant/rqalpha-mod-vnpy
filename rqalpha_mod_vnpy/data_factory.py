@@ -10,7 +10,7 @@ from rqalpha.model.position.future_position import FuturePosition
 from rqalpha.model.account.future_account import FutureAccount, margin_of
 from rqalpha.const import ORDER_STATUS, ORDER_TYPE, POSITION_EFFECT
 from .vnpy import EXCHANGE_SHFE, OFFSET_OPEN, OFFSET_CLOSETODAY, DIRECTION_SHORT, DIRECTION_LONG
-from .vnpy import STATUS_NOTTRADED, STATUS_PARTTRADED, STATUS_ALLTRADED, STATUS_CANCELLED, STATUS_UNKNOWN, CURRENCY_CNY, PRODUCT_FUTURES
+from .vnpy import STATUS_NOTTRADED, STATUS_PARTTRADED
 
 from .utils import SIDE_REVERSE
 
@@ -178,6 +178,7 @@ class AccountCache(object):
         if vnpy_position.direction == DIRECTION_LONG:
             if 'position' in vnpy_position.__dict__:
                 self._position_cache[order_book_id]['buy_old_quantity'] = vnpy_position.ydPosition
+                self._position_cache[order_book_id]['buy_quantity'] = vnpy_position.position
                 self._position_cache[order_book_id]['buy_today_quantity'] = vnpy_position.position - vnpy_position.ydPosition
             if 'commission' in vnpy_position.__dict__:
                 if 'buy_transaction_cost' not in self._position_cache[order_book_id]:
@@ -190,12 +191,13 @@ class AccountCache(object):
             if 'openCost' in vnpy_position.__dict__:
                 self._buy_open_cost_cache += vnpy_position.openCost
                 contract_multiplier = self._data_cache.get_contract(vnpy_position.symbol)['size']
-                buy_quantity = self._account_dict['portfolio']['positions'][order_book_id]['buy_quantity']
+                buy_quantity = self._position_cache[order_book_id]['buy_quantity']
                 self._position_cache[order_book_id]['buy_avg_open_price'] = self._buy_open_cost_cache / (buy_quantity * contract_multiplier) if buy_quantity != 0 else 0
 
         elif vnpy_position.direction == DIRECTION_SHORT:
             if 'position' in vnpy_position.__dict__:
                 self._position_cache[order_book_id]['sell_old_quantity'] = vnpy_position.ydPosition
+                self._position_cache[order_book_id]['sell_position'] = vnpy_position.position
                 self._position_cache[order_book_id]['sell_today_quantity'] = vnpy_position.position - vnpy_position.ydPosition
             if 'commission' in vnpy_position.__dict__:
                 if 'sell_transaction_cost' not in self._position_cache[order_book_id]:
@@ -208,7 +210,7 @@ class AccountCache(object):
             if 'openCost' in vnpy_position.__dict__:
                 self._sell_open_cost_cache += vnpy_position.openCost
                 contract_multiplier = self._data_cache.get_contract(vnpy_position.symbol)['size']
-                sell_quantity = self._account_dict['portfolio']['positions'][order_book_id]['sell_quantity']
+                sell_quantity = self._position_cache[order_book_id]['sell_quantity']
                 self._position_cache[order_book_id]['sell_avg_open_price'] = self._sell_open_cost_cache / (sell_quantity * contract_multiplier) if sell_quantity != 0 else 0
 
         if 'preSettlementPrice' in vnpy_position.__dict__:

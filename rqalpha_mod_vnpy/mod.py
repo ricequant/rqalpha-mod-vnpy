@@ -15,9 +15,6 @@ class VNPYMod(AbstractMod):
         self._engine = None
         self._data_cache = DataCache()
 
-    def init_engine(self, event):
-        self._engine.init_account(block=True)
-
     def start_up(self, env, mod_config):
         self._env = env
         self._engine = RQVNPYEngine(env, mod_config, self._data_cache)
@@ -25,7 +22,7 @@ class VNPYMod(AbstractMod):
         self._env.set_broker(VNPYBroker(env, self._engine))
         self._env.set_event_source(VNPYEventSource(env, self._engine))
         self._env.set_data_source(VNPYDataSource(env, self._data_cache))
-        self._env.event_bus.add_listener(EVENT.POST_SYSTEM_INIT, self.init_engine)
+        self._engine.init_account(block=True)
 
     def tear_down(self, code, exception=None):
         self._engine.exit()

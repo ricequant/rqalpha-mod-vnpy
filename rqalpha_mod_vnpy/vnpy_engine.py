@@ -7,6 +7,8 @@ import numpy as np
 from rqalpha.events import EVENT, Event
 from rqalpha.utils.logger import system_log
 from rqalpha.const import ACCOUNT_TYPE, ORDER_STATUS
+from rqalpha.model.portfolio import Portfolio
+from rqalpha.environment import Environment
 
 from .vnpy import VtOrderReq, VtCancelOrderReq, VtSubscribeReq
 from .vnpy import EVENT_CONTRACT, EVENT_ORDER, EVENT_TRADE, EVENT_TICK, EVENT_LOG, EVENT_ACCOUNT, EVENT_POSITION
@@ -44,7 +46,7 @@ class RQVNPYEngine(object):
 
     # ------------------------------------ order生命周期 ------------------------------------
     def send_order(self, order):
-        account = self._get_account_for(order.order_book_id)
+        account = Environment.get_instance().get_account(order.order_book_id)
         self._env.event_bus.publish_event(Event(EVENT.ORDER_PENDING_NEW, account=account, order=order))
 
         symbol = self._data_cache.get_symbol(order.order_book_id)
@@ -73,7 +75,7 @@ class RQVNPYEngine(object):
         self._data_cache.put_order(vnpy_order_id, order)
 
     def cancel_order(self, order):
-        account = self._get_account_for(order.order_book_id)
+        account = Environment.get_instance().get_account(order.order_book_id)
         self._env.event_bus.publish_event(Event(EVENT.ORDER_PENDING_CANCEL, account=account, order=order))
 
         vnpy_order = self._data_cache.get_vnpy_order(order.order_id)
@@ -97,7 +99,7 @@ class RQVNPYEngine(object):
         order = self._data_cache.get_order(vnpy_order_id)
 
         if order is not None:
-            account = self._get_account_for(order.order_book_id)
+            account = Environment.get_instance().get_account(order.order_book_id)
 
             order._activate()
 
@@ -265,6 +267,22 @@ class RQVNPYEngine(object):
         if not self._account_inited:
             self._account_cache.put_vnpy_account(vnpy_account)
 
+    # ------------------------------------ portfolio生命周期 ------------------------------------
+
+    def init_account(self, block=False):
+        self.vnpy_gateway.init_account()
+        if block:
+            while not self._account_inited:
+                continue
+
+    def get_portfolio(self):
+        future_account = self._account_cache.make_account()
+        start_date = self._env.config.base.start_date
+        return Portfolio(start_date, 1, future_account._total_cash, {ACCOUNT_TYPE.FUTURE: future_account})
+
+    def on_init_portfolio(self, event):
+        self._account_inited = True
+
     # ------------------------------------ gateway 和 event engine生命周期 ------------------------------------
     def _init_gateway(self):
         self.gateway_type = self._config.gateway_type
@@ -282,16 +300,6 @@ class RQVNPYEngine(object):
     def connect(self):
         self.vnpy_gateway.connect_and_init_contract()
 
-    def init_account(self, block=False):
-        self.vnpy_gateway.init_account()
-        if block:
-            while not self._account_inited:
-                continue
-
-    def on_init_account(self, event):
-        self.accounts[ACCOUNT_TYPE.FUTURE] = self._account_cache.make_account()
-        self._account_inited = True
-
     def exit(self):
         self.vnpy_gateway.close()
         self.event_engine.stop()
@@ -307,18 +315,11 @@ class RQVNPYEngine(object):
         self.event_engine.register(EVENT_POSITION_EXTRA, self.on_position_extra)
         self.event_engine.register(EVENT_CONTRACT_EXTRA, self.on_contract_extra)
         self.event_engine.register(EVENT_COMMISSION, self.on_commission)
-        self.event_engine.register(EVENT_INIT_ACCOUNT, self.on_init_account)
+        self.event_engine.register(EVENT_INIT_ACCOUNT, self.on_init_portfolio)
 
         self._env.event_bus.add_listener(EVENT.POST_UNIVERSE_CHANGED, self.on_universe_changed)
 
     # ------------------------------------ 其他 ------------------------------------
     def on_log(self, event):
         log = event.dict_['data']
-        system_log.debug(log.logContent)
-
-    def _get_account_for(self, order_book_id):
-        if not self._account_inited:
-            return None
-        # hard code
-        account_type = ACCOUNT_TYPE.FUTURE
-        return self.accounts[account_type]
+        system_log.info(log.logContent)

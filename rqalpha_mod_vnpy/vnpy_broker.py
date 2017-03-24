@@ -22,7 +22,7 @@ class VNPYBroker(AbstractBroker):
     def __init__(self, env, vnpy_engine):
         self._env = env
 
-        self._accounts = None
+        self. _accounts = None
 
         self._engine = vnpy_engine
         self._vnpy_gateway_type = self._env.config.mod.vnpy.gateway_type
@@ -35,9 +35,6 @@ class VNPYBroker(AbstractBroker):
     def before_trading(self):
         pass
 
-    def get_accounts(self):
-        return self._engine.accounts
-
     def get_open_orders(self):
         return self._engine.open_orders
 
@@ -49,3 +46,9 @@ class VNPYBroker(AbstractBroker):
 
     def update(self, calendar_dt, trading_dt, bar_dict):
         pass
+
+    def get_portfolio(self):
+        return self._engine.get_portfolio()
+
+    def get_benchmark_portfolio(self):
+        return None
