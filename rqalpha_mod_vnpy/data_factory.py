@@ -2,6 +2,7 @@
 from dateutil.parser import parse
 from datetime import timedelta
 from six import iteritems
+import numpy as np
 
 from rqalpha.model.order import Order, LimitOrder
 from rqalpha.model.trade import Trade
@@ -9,9 +10,10 @@ from rqalpha.model.position import Positions
 from rqalpha.model.position.future_position import FuturePosition
 from rqalpha.model.account.future_account import FutureAccount, margin_of
 from rqalpha.environment import Environment
-from rqalpha.const import ORDER_STATUS, HEDGE_TYPE, POSITION_EFFECT, COMMISSION_TYPE, SIDE
-from .vnpy import EXCHANGE_SHFE, OFFSET_OPEN, OFFSET_CLOSETODAY, DIRECTION_SHORT, DIRECTION_LONG
-from .vnpy import STATUS_NOTTRADED, STATUS_PARTTRADED
+from rqalpha.const import ORDER_STATUS, HEDGE_TYPE, POSITION_EFFECT, COMMISSION_TYPE, SIDE, ORDER_TYPE
+from .vnpy import EXCHANGE_SHFE, OFFSET_OPEN, OFFSET_CLOSE, OFFSET_CLOSETODAY, DIRECTION_SHORT, DIRECTION_LONG
+from .vnpy import STATUS_NOTTRADED, STATUS_PARTTRADED, PRICETYPE_MARKETPRICE, PRICETYPE_LIMITPRICE, CURRENCY_CNY, PRODUCT_FUTURES
+from .vnpy import VtOrderReq, VtCancelOrderReq, VtSubscribeReq
 
 
 class AccountCache(object):
@@ -169,8 +171,23 @@ class DataFactory(object):
         DIRECTION_SHORT: SIDE.SELL,
     }
 
-    def __init__(self):
-        pass
+    SIDE_MAPPING = {
+        SIDE.BUY: DIRECTION_LONG,
+        SIDE.SELL: DIRECTION_SHORT
+    }
+
+    ORDER_TYPE_MAPPING = {
+        ORDER_TYPE.MARKET: PRICETYPE_MARKETPRICE,
+        ORDER_TYPE.LIMIT: PRICETYPE_LIMITPRICE
+    }
+
+    POSITION_EFFECT_MAPPING = {
+        POSITION_EFFECT.OPEN: OFFSET_OPEN,
+        POSITION_EFFECT.CLOSE: OFFSET_CLOSE,
+    }
+
+    def __init__(self, data_cache):
+        self._data_cache = data_cache
 
     @classmethod
     def make_trading_dt(cls, calendar_dt):
@@ -270,3 +287,96 @@ class DataFactory(object):
         return Trade.__from_create__(
             order_id, calendar_dt, trading_dt, price, amount, side, position_effect,  order_book_id,
             commission=commission, frozen_price=frozen_price)
+
+    @classmethod
+    def make_tick(cls, vnpy_tick):
+        order_book_id = cls.make_order_book_id(vnpy_tick.symbol)
+        tick = {
+            'order_book_id': order_book_id,
+            'datetime': parse('%s %s' % (vnpy_tick.date, vnpy_tick.time)),
+            'open': vnpy_tick.openPrice,
+            'last': vnpy_tick.lastPrice,
+            'low': vnpy_tick.lowPrice,
+            'high': vnpy_tick.highPrice,
+            'prev_close': vnpy_tick.preClosePrice,
+            'volume': vnpy_tick.volume,
+            'total_turnover': np.nan,
+            'open_interest': vnpy_tick.openInterest,
+            'prev_settlement': np.nan,
+
+            'bid': [
+                vnpy_tick.bidPrice1,
+                vnpy_tick.bidPrice2,
+                vnpy_tick.bidPrice3,
+                vnpy_tick.bidPrice4,
+                vnpy_tick.bidPrice5,
+            ],
+            'bid_volume': [
+                vnpy_tick.bidVolume1,
+                vnpy_tick.bidVolume2,
+                vnpy_tick.bidVolume3,
+                vnpy_tick.bidVolume4,
+                vnpy_tick.bidVolume5,
+            ],
+            'ask': [
+                vnpy_tick.askPrice1,
+                vnpy_tick.askPrice2,
+                vnpy_tick.askPrice3,
+                vnpy_tick.askPrice4,
+                vnpy_tick.askPrice5,
+            ],
+            'ask_volume': [
+                vnpy_tick.askVolume1,
+                vnpy_tick.askVolume2,
+                vnpy_tick.askVolume3,
+                vnpy_tick.askVolume4,
+                vnpy_tick.askVolume5,
+            ],
+
+            'limit_up': vnpy_tick.upperLimit,
+            'limit_down': vnpy_tick.lowerLimit,
+        }
+        return tick
+
+    def make_order_req(self, order):
+        symbol = self._data_cache.get_symbol(order.order_book_id)
+        contract = self._data_cache.get_contract(symbol)
+        if contract is None:
+            return None
+
+        order_req = VtOrderReq()
+        order_req.symbol = contract['symbol']
+        order_req.exchange = contract['exchange']
+        order_req.price = order.price
+        order_req.volume = order.quantity
+        order_req.direction = self.SIDE_MAPPING[order.side]
+        order_req.priceType = self.ORDER_TYPE_MAPPING[order.type]
+        order_req.offset = self.POSITION_EFFECT_MAPPING[order.position_effect]
+        order_req.currency = CURRENCY_CNY
+        order_req.productClass = PRODUCT_FUTURES
+
+        return order_req
+
+    def make_cancel_order_req(self, order):
+        vnpy_order = self._data_cache.get_vnpy_order(order.order_id)
+
+        cancel_order_req = VtCancelOrderReq()
+        cancel_order_req.symbol = vnpy_order.symbol
+        cancel_order_req.exchange = vnpy_order.exchange
+        cancel_order_req.sessionID = vnpy_order.sessionID
+        cancel_order_req.orderID = vnpy_order.orderID
+
+        return cancel_order_req
+
+    def make_subscribe_req(self, order_book_id):
+        symbol = self._data_cache.get_symbol(order_book_id)
+        contract = self._data_cache.get_contract(symbol)
+        if contract is None:
+            return None
+        subscribe_req = VtSubscribeReq()
+        subscribe_req.symbol = contract['symbol']
+        subscribe_req.exchange = contract['exchange']
+        subscribe_req.productClass = PRODUCT_FUTURES
+        subscribe_req.currency = CURRENCY_CNY
+
+        return subscribe_req

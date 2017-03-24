@@ -7,6 +7,7 @@ from .vnpy_broker import VNPYBroker
 from .vnpy_data_source import VNPYDataSource
 from .vnpy_price_board import VNPYPriceBoard
 from .data_cache import DataCache
+from .data_factory import DataFactory
 
 
 class VNPYMod(AbstractMod):
@@ -14,10 +15,11 @@ class VNPYMod(AbstractMod):
         self._env = None
         self._engine = None
         self._data_cache = DataCache()
+        self._data_factory = DataFactory(self._data_cache)
 
     def start_up(self, env, mod_config):
         self._env = env
-        self._engine = RQVNPYEngine(env, mod_config, self._data_cache)
+        self._engine = RQVNPYEngine(env, mod_config, self._data_cache, self._data_factory)
         self._engine.connect()
         self._env.set_broker(VNPYBroker(env, self._engine))
         self._env.set_event_source(VNPYEventSource(env, mod_config, self._engine))

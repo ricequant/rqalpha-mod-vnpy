@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
-from dateutil.parser import parse
 from Queue import Queue
 from Queue import Empty
-import numpy as np
 
 from rqalpha.events import EVENT, Event
 from rqalpha.utils.logger import system_log
@@ -10,20 +8,18 @@ from rqalpha.const import ACCOUNT_TYPE, ORDER_STATUS
 from rqalpha.model.portfolio import Portfolio
 from rqalpha.environment import Environment
 
-from .vnpy import VtOrderReq, VtCancelOrderReq, VtSubscribeReq
 from .vnpy import EVENT_CONTRACT, EVENT_ORDER, EVENT_TRADE, EVENT_TICK, EVENT_LOG, EVENT_ACCOUNT, EVENT_POSITION
 from .vnpy import STATUS_NOTTRADED, STATUS_PARTTRADED, STATUS_ALLTRADED, STATUS_CANCELLED, STATUS_UNKNOWN, CURRENCY_CNY, PRODUCT_FUTURES
 
 from .vnpy_gateway import EVENT_POSITION_EXTRA, EVENT_CONTRACT_EXTRA, EVENT_COMMISSION, EVENT_INIT_ACCOUNT
 from .vnpy_gateway import RQVNEventEngine
-from .data_factory import AccountCache, DataFactory
-from .utils import SIDE_MAPPING, ORDER_TYPE_MAPPING, POSITION_EFFECT_MAPPING
+from .data_factory import AccountCache
 
 _engine = None
 
 
 class RQVNPYEngine(object):
-    def __init__(self, env, config, data_cache):
+    def __init__(self, env, config, data_cache, data_factory):
         self._env = env
         self._config = config
         self.event_engine = RQVNEventEngine()
@@ -37,6 +33,7 @@ class RQVNPYEngine(object):
 
         self._init_gateway()
         self._data_cache = data_cache
+        self._data_factory = data_factory
         self._account_cache = AccountCache(data_cache)
 
         self._tick_que = Queue()
@@ -49,27 +46,15 @@ class RQVNPYEngine(object):
         account = Environment.get_instance().get_account(order.order_book_id)
         self._env.event_bus.publish_event(Event(EVENT.ORDER_PENDING_NEW, account=account, order=order))
 
-        symbol = self._data_cache.get_symbol(order.order_book_id)
-        contract = self._data_cache.get_contract(symbol)
+        order_req = self._data_factory.make_order_req(order)
 
-        if contract is None:
+        if order_req is None:
             self._env.event_bus.publish_event(Event(EVENT.ORDER_PENDING_CANCEL))
             order.mark_cancelled('No contract exists whose order_book_id is %s' % order.order_book_id)
             self._env.event_bus.publish_event(Event(EVENT.ORDER_CANCELLATION_PASS))
 
         if order.is_final():
             return
-
-        order_req = VtOrderReq()
-        order_req.symbol = contract['symbol']
-        order_req.exchange = contract['exchange']
-        order_req.price = order.price
-        order_req.volume = order.quantity
-        order_req.direction = SIDE_MAPPING[order.side]
-        order_req.priceType = ORDER_TYPE_MAPPING[order.type]
-        order_req.offset = POSITION_EFFECT_MAPPING[order.position_effect]
-        order_req.currency = CURRENCY_CNY
-        order_req.productClass = PRODUCT_FUTURES
 
         vnpy_order_id = self.vnpy_gateway.sendOrder(order_req)
         self._data_cache.put_order(vnpy_order_id, order)
@@ -78,13 +63,8 @@ class RQVNPYEngine(object):
         account = Environment.get_instance().get_account(order.order_book_id)
         self._env.event_bus.publish_event(Event(EVENT.ORDER_PENDING_CANCEL, account=account, order=order))
 
-        vnpy_order = self._data_cache.get_vnpy_order(order.order_id)
+        cancel_order_req = self._data_factory.make_cancel_order_req(order)
 
-        cancel_order_req = VtCancelOrderReq()
-        cancel_order_req.symbol = vnpy_order.symbol
-        cancel_order_req.exchange = vnpy_order.exchange
-        cancel_order_req.sessionID = vnpy_order.sessionID
-        cancel_order_req.orderID = vnpy_order.orderID
         self.vnpy_gateway.put_query(self.vnpy_gateway.cancelOrder, cancelOrderReq=cancel_order_req)
 
     def on_order(self, event):
@@ -131,7 +111,7 @@ class RQVNPYEngine(object):
     def on_trade(self, event):
         vnpy_trade = event.dict_['data']
         system_log.debug("on_trade {}", vnpy_trade.__dict__)
-        order_book_id = DataFactory.make_order_book_id(vnpy_trade.symbol)
+        order_book_id = self._data_factory.make_order_book_id(vnpy_trade.symbol)
         future_info = self._data_cache.get_future_info(order_book_id)
         if future_info is None or 'open_commission_ratio' not in future_info:
             self.vnpy_gateway.put_query(self.vnpy_gateway.qryCommission,
@@ -143,8 +123,8 @@ class RQVNPYEngine(object):
             self._account_cache.put_vnpy_trade(vnpy_trade)
         else:
             if order is None:
-                DataFactory.make_order_from_vnpy_trade(vnpy_trade)
-            trade = DataFactory.make_trade(vnpy_trade, order.order_id)
+                self._data_factory.make_order_from_vnpy_trade(vnpy_trade)
+            trade = self._data_factory.make_trade(vnpy_trade, order.order_id)
             order.fill(trade)
             account = Environment.get_instance().get_account(order.order_book_id)
             self._env.event_bus.publish_event(Event(EVENT.TRADE, account=account, trade=trade))
@@ -172,68 +152,16 @@ class RQVNPYEngine(object):
             self.subscribe(order_book_id)
 
     def subscribe(self, order_book_id):
-        symbol = self._data_cache.get_symbol(order_book_id)
-        contract = self._data_cache.get_contract(symbol)
-        if contract is None:
+        subscribe_req = self._data_factory.make_subscribe_req(order_book_id)
+        if subscribe_req is None:
             system_log.error('Cannot find contract whose order_book_id is %s' % order_book_id)
             return
-        subscribe_req = VtSubscribeReq()
-        subscribe_req.symbol = contract['symbol']
-        subscribe_req.exchange = contract['exchange']
-        # hard code
-        subscribe_req.productClass = PRODUCT_FUTURES
-        subscribe_req.currency = CURRENCY_CNY
         self.vnpy_gateway.put_query(self.vnpy_gateway.subscribe, subscribeReq=subscribe_req)
 
     def on_tick(self, event):
         vnpy_tick = event.dict_['data']
         system_log.debug("on_tick {}", vnpy_tick.__dict__)
-        order_book_id = DataFactory.make_order_book_id(vnpy_tick.symbol)
-        tick = {
-            'order_book_id': order_book_id,
-            'datetime': parse('%s %s' % (vnpy_tick.date, vnpy_tick.time)),
-            'open': vnpy_tick.openPrice,
-            'last': vnpy_tick.lastPrice,
-            'low': vnpy_tick.lowPrice,
-            'high': vnpy_tick.highPrice,
-            'prev_close': vnpy_tick.preClosePrice,
-            'volume': vnpy_tick.volume,
-            'total_turnover': np.nan,
-            'open_interest': vnpy_tick.openInterest,
-            'prev_settlement': np.nan,
-
-            'bid': [
-                vnpy_tick.bidPrice1,
-                vnpy_tick.bidPrice2,
-                vnpy_tick.bidPrice3,
-                vnpy_tick.bidPrice4,
-                vnpy_tick.bidPrice5,
-            ],
-            'bid_volume': [
-                vnpy_tick.bidVolume1,
-                vnpy_tick.bidVolume2,
-                vnpy_tick.bidVolume3,
-                vnpy_tick.bidVolume4,
-                vnpy_tick.bidVolume5,
-            ],
-            'ask': [
-                vnpy_tick.askPrice1,
-                vnpy_tick.askPrice2,
-                vnpy_tick.askPrice3,
-                vnpy_tick.askPrice4,
-                vnpy_tick.askPrice5,
-            ],
-            'ask_volume': [
-                vnpy_tick.askVolume1,
-                vnpy_tick.askVolume2,
-                vnpy_tick.askVolume3,
-                vnpy_tick.askVolume4,
-                vnpy_tick.askVolume5,
-            ],
-
-            'limit_up': vnpy_tick.upperLimit,
-            'limit_down': vnpy_tick.lowerLimit,
-        }
+        tick = self._data_factory.make_tick(vnpy_tick)
         self._tick_que.put(tick)
         self._data_cache.put_tick_snapshot(tick)
 
