@@ -6,8 +6,8 @@ from six import iteritems
 from rqalpha.model.order import Order
 from rqalpha.model.trade import Trade
 from rqalpha.model.instrument import Instrument
-from rqalpha.model.position.future_position import FuturePosition, margin_of
-from rqalpha.model.acount.future_account import FutureAccount
+from rqalpha.model.position.future_position import FuturePosition
+from rqalpha.model.account.future_account import FutureAccount, margin_of
 from rqalpha.const import ORDER_STATUS, ORDER_TYPE, POSITION_EFFECT
 from .vnpy import EXCHANGE_SHFE, OFFSET_OPEN, OFFSET_CLOSETODAY, DIRECTION_SHORT, DIRECTION_LONG
 from .vnpy import STATUS_NOTTRADED, STATUS_PARTTRADED, STATUS_ALLTRADED, STATUS_CANCELLED, STATUS_UNKNOWN, CURRENCY_CNY, PRODUCT_FUTURES
@@ -288,7 +288,3 @@ class AccountCache(object):
                 frozen_cash += margin_of(order_book_id, unfilled_quantity, price)
         account._frozen_cash = frozen_cash
         return account
-
-    @property
-    def account_dict(self):
-        return self._account_dict

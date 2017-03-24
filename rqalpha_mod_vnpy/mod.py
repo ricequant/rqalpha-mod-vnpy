@@ -25,7 +25,6 @@ class VNPYMod(AbstractMod):
         self._env.set_broker(VNPYBroker(env, self._engine))
         self._env.set_event_source(VNPYEventSource(env, self._engine))
         self._env.set_data_source(VNPYDataSource(env, self._data_cache))
-        # self._engine.do_init()
         self._env.event_bus.add_listener(EVENT.POST_SYSTEM_INIT, self.init_engine)
 
     def tear_down(self, code, exception=None):
