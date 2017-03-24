@@ -54,10 +54,10 @@ class RQVNPYEngine(object):
 
         if contract is None:
             self._env.event_bus.publish_event(Event(EVENT.ORDER_PENDING_CANCEL))
-            order._mark_cancelled('No contract exists whose order_book_id is %s' % order.order_book_id)
+            order.mark_cancelled('No contract exists whose order_book_id is %s' % order.order_book_id)
             self._env.event_bus.publish_event(Event(EVENT.ORDER_CANCELLATION_PASS))
 
-        if order._is_final():
+        if order.is_final():
             return
 
         order_req = VtOrderReq()
@@ -101,7 +101,7 @@ class RQVNPYEngine(object):
         if order is not None:
             account = Environment.get_instance().get_account(order.order_book_id)
 
-            order._activate()
+            order.activate()
 
             self._env.event_bus.publish_event(Event(EVENT.ORDER_CREATION_PASS, account=account, order=order))
 
@@ -113,10 +113,10 @@ class RQVNPYEngine(object):
             elif vnpy_order.status == STATUS_CANCELLED:
                 self._data_cache.del_open_order(vnpy_order_id)
                 if order.status == ORDER_STATUS.PENDING_CANCEL:
-                    order._mark_cancelled("%d order has been cancelled by user." % order.order_id)
+                    order.mark_cancelled("%d order has been cancelled by user." % order.order_id)
                     self._env.event_bus.publish_event(Event(EVENT.ORDER_CANCELLATION_PASS, account=account, order=order))
                 else:
-                    order._mark_rejected('Order was rejected or cancelled by vnpy.')
+                    order.mark_rejected('Order was rejected or cancelled by vnpy.')
                     self._env.event_bus.publish_event(Event(EVENT.ORDER_UNSOLICITED_UPDATE, account=account, order=order))
         else:
             if not self._account_inited:
@@ -149,7 +149,7 @@ class RQVNPYEngine(object):
             # TODO: 以下三行是否需要在 mod 中实现？
             trade._commission = account.commission_decider.get_commission(trade)
             trade._tax = account.tax_decider.get_tax(trade)
-            order._fill(trade)
+            order.fill(trade)
             self._env.event_bus.publish_event(Event(EVENT.TRADE, account=account, trade=trade))
 
     # ------------------------------------ instrument生命周期 ------------------------------------
