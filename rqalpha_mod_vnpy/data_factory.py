@@ -6,6 +6,7 @@ from six import iteritems
 from rqalpha.model.order import Order
 from rqalpha.model.trade import Trade
 from rqalpha.model.instrument import Instrument
+from rqalpha.model.position import Positions,FuturePosition
 from rqalpha.model.position.future_position import FuturePosition
 from rqalpha.model.account.future_account import FutureAccount, margin_of
 from rqalpha.const import ORDER_STATUS, ORDER_TYPE, POSITION_EFFECT
@@ -123,14 +124,28 @@ class RQVNOrder(Order):
 class RQVNTrade(Trade):
     def __init__(self, vnpy_trade, order):
         super(RQVNTrade, self).__init__()
+        self._order_book_id = symbol_2_order_book_id(vnpy_trade.symbol)
         self._calendar_dt = parse(vnpy_trade.tradeTime)
         self._trading_dt = _trading_dt(self._calendar_dt)
         self._price = vnpy_trade.price
+        self._frozen_price = vnpy_trade.price
         self._amount = vnpy_trade.volume
         self._order = order
         self._tax = 0.
         self._trade_id = next(self.trade_id_gen)
         self._close_today_amount = 0.
+        if vnpy_trade.exchange == EXCHANGE_SHFE:
+            if vnpy_trade.offset == OFFSET_OPEN:
+                self._position_effect = POSITION_EFFECT.OPEN
+            elif vnpy_trade.offset == OFFSET_CLOSETODAY:
+                self._position_effect = POSITION_EFFECT.CLOSE_TODAY
+            else:
+                self._position_effect = POSITION_EFFECT.CLOSE
+        else:
+            if vnpy_trade.offset == OFFSET_OPEN:
+                self._position_effect = POSITION_EFFECT.OPEN
+            else:
+                self._position_effect = POSITION_EFFECT.CLOSE
 
 
 class AccountCache(object):
@@ -207,7 +222,7 @@ class AccountCache(object):
             self._position_cache[order_book_id]['prev_settle_price'] = vnpy_position.preSettlementPrice
 
     def _make_positions(self):
-        positions = {}
+        positions = Positions(FuturePosition)
         for order_book_id, position_dict in iteritems(self._position_cache):
             position = FuturePosition(order_book_id)
             if 'prev_settle_price' in position_dict and 'buy_old_quantity' in position_dict:

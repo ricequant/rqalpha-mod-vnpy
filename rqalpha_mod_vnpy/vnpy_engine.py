@@ -17,7 +17,7 @@ from .vnpy import STATUS_NOTTRADED, STATUS_PARTTRADED, STATUS_ALLTRADED, STATUS_
 from .vnpy_gateway import EVENT_POSITION_EXTRA, EVENT_CONTRACT_EXTRA, EVENT_COMMISSION, EVENT_INIT_ACCOUNT
 from .vnpy_gateway import RQVNEventEngine
 from .data_factory import RQVNOrder, RQVNTrade, AccountCache
-from .utils import SIDE_MAPPING, ORDER_TYPE_MAPPING, POSITION_EFFECT_MAPPING, symbol_2_order_book_id
+from .utils import SIDE_MAPPING, ORDER_TYPE_MAPPING, POSITION_EFFECT_MAPPING, symbol_2_order_book_id, get_commission
 
 _engine = None
 
@@ -88,7 +88,6 @@ class RQVNPYEngine(object):
         self.vnpy_gateway.put_query(self.vnpy_gateway.cancelOrder, cancelOrderReq=cancel_order_req)
 
     def on_order(self, event):
-
         vnpy_order = event.dict_['data']
         system_log.debug("on_order {}", vnpy_order.__dict__)
         # FIXME 发现订单会重复返回，此操作是否会导致订单丢失有待验证
@@ -101,7 +100,7 @@ class RQVNPYEngine(object):
         if order is not None:
             account = Environment.get_instance().get_account(order.order_book_id)
 
-            order.activate()
+            order.active()
 
             self._env.event_bus.publish_event(Event(EVENT.ORDER_CREATION_PASS, account=account, order=order))
 
@@ -134,7 +133,7 @@ class RQVNPYEngine(object):
         system_log.debug("on_trade {}", vnpy_trade.__dict__)
         order_book_id = symbol_2_order_book_id(vnpy_trade.symbol)
         future_info = self._data_cache.get_future_info(order_book_id)
-        if future_info is None or ['open_commission_ratio'] not in future_info:
+        if future_info is None or 'open_commission_ratio' not in future_info:
             self.vnpy_gateway.put_query(self.vnpy_gateway.qryCommission,
                                         symbol=vnpy_trade.symbol,
                                         exchange=vnpy_trade.exchange)
@@ -147,9 +146,9 @@ class RQVNPYEngine(object):
                 order = RQVNOrder.create_from_vnpy_trade__(vnpy_trade)
             trade = RQVNTrade(vnpy_trade, order)
             # TODO: 以下三行是否需要在 mod 中实现？
-            trade._commission = account.commission_decider.get_commission(trade)
-            trade._tax = account.tax_decider.get_tax(trade)
+            trade._commission = get_commission(trade)
             order.fill(trade)
+            account = Environment.get_instance().get_account(order.order_book_id)
             self._env.event_bus.publish_event(Event(EVENT.TRADE, account=account, trade=trade))
 
     # ------------------------------------ instrument生命周期 ------------------------------------

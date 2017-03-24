@@ -37,6 +37,7 @@ class VNPYDataSource(BaseDataSource):
         e = date.fromtimestamp(2147483647)
         return s, e
 
-    def get_future_info(self, order_book_id, hedge_type):
+    def get_future_info(self, instrument, hedge_type):
+        order_book_id = instrument.order_book_id
         hedge_flag = hedge_type.value
         return self._data_cache.get_future_info(order_book_id, hedge_flag)
