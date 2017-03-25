@@ -220,7 +220,7 @@ class RQVNPYEngine(object):
             system_log.error('No Gateway named {}', self.gateway_type)
 
     def connect(self):
-        self.vnpy_gateway.connect_and_init_contract()
+        self.vnpy_gateway.connect()
 
     def exit(self):
         self.vnpy_gateway.close()

@@ -30,7 +30,7 @@ class QueryExecutor(object):
     ret_dict = {}
 
     activate = False
-    interval = 0.8
+    interval = 1
 
     execution_thread = None
 
@@ -185,6 +185,39 @@ class RQCTPTdApi(CtpTdApi):
 
         self.gateway.onContractExtra(contractExtra)
 
+    @QueryExecutor.linear_execution()
+    def connect(self, *args, **kwargs):
+        super(RQCTPTdApi, self).connect(*args, **kwargs)
+
+    @QueryExecutor.linear_execution()
+    def login(self, *args, **kwargs):
+        super(RQCTPTdApi, self).login(*args, **kwargs)
+
+    @QueryExecutor.linear_execution()
+    def reqSettlementInfoConfirm(self, *args, **kwargs):
+        super(RQCTPTdApi, self).reqSettlementInfoConfirm(*args, **kwargs)
+
+    @QueryExecutor.linear_execution()
+    def reqQryInstrument(self, *args, **kwargs):
+        super(RQCTPTdApi, self).reqQryInstrument(*args, **kwargs)
+
+    @QueryExecutor.linear_execution()
+    def qryAccount(self, *args, **kwargs):
+        super(RQCTPTdApi, self).qryAccount(*args, **kwargs)
+
+    @QueryExecutor.linear_execution()
+    def qryPosition(self, *args, **kwargs):
+        super(RQCTPTdApi, self).qryPosition(*args, **kwargs)
+
+    @QueryExecutor.linear_execution()
+    def sendOrder(self, *args, **kwargs):
+        super(RQCTPTdApi, self).sendOrder(*args, **kwargs)
+
+    @QueryExecutor.linear_execution()
+    def cancelOrder(self, *args, **kwargs):
+        super(RQCTPTdApi, self).cancelOrder(*args, **kwargs)
+
+    @QueryExecutor.linear_execution()
     def reqCommission(self, instrumentId, exchangeId, userId, brokerId):
         self.reqID += 1
         req = {
@@ -213,6 +246,18 @@ class RQCTPMdApi(CtpMdApi):
     def __init__(self, gateway):
         super(RQCTPMdApi, self).__init__(gateway)
 
+    @QueryExecutor.linear_execution()
+    def connect(self, *args, **kwargs):
+        super(RQCTPMdApi, self).connect(*args, **kwargs)
+
+    @QueryExecutor.linear_execution()
+    def login(self, *args, **kwargs):
+        super(RQCTPMdApi, self).login(*args, **kwargs)
+
+    @QueryExecutor.linear_execution()
+    def subscribe(self, *args, **kwargs):
+        super(RQCTPMdApi, self).subscribe(*args, **kwargs)
+
 
 # ------------------------------------ 扩展gateway ------------------------------------
 class RQVNCTPGateway(CtpGateway):
@@ -231,10 +276,6 @@ class RQVNCTPGateway(CtpGateway):
 
         self.login_dict = login_dict
 
-    def connect_and_init_contract(self):
-        self.connect()
-
-    @QueryExecutor.linear_execution()
     def connect(self):
         userID = str(self.login_dict['userID'])
         password = str(self.login_dict['password'])
@@ -246,11 +287,9 @@ class RQVNCTPGateway(CtpGateway):
         self.tdApi.connect(userID, password, brokerID, tdAddress, None, None)
         self.initQuery()
 
-    @QueryExecutor.linear_execution()
     def qryAccount(self):
         super(RQVNCTPGateway, self).qryAccount()
 
-    @QueryExecutor.linear_execution()
     def qryPosition(self):
         super(RQVNCTPGateway, self).qryPosition()
 
@@ -260,7 +299,6 @@ class RQVNCTPGateway(CtpGateway):
         event = Event(type_=EVENT_INIT_ACCOUNT)
         self.eventEngine.put(event)
 
-    @QueryExecutor.linear_execution()
     def qryCommission(self, symbol, exchange):
         self.tdApi.reqCommission(symbol, exchange, self.login_dict['userID'], self.login_dict['brokerID'])
 
@@ -279,3 +317,13 @@ class RQVNCTPGateway(CtpGateway):
         event.dict_['data'] = commissionData
         self.eventEngine.put(event)
 
+    def onRspSettlementInfoConfirm(self, data, error, n, last):
+        """确认结算信息回报"""
+        log = VtLogData()
+        log.gatewayName = self.gatewayName
+        log.logContent = u'结算信息确认完成'
+        self.gateway.onLog(log)
+
+        # 查询合约代码
+        self.reqID += 1
+        self.reqQryInstrument({}, self.reqID)
