@@ -64,7 +64,7 @@ class RQVNPYEngine(object):
         if cancel_order_req is None:
             system_log.warn('Cannot find VN.PY order in order cache.')
 
-        self.vnpy_gateway.put_query(self.vnpy_gateway.cancelOrder, cancelOrderReq=cancel_order_req)
+        self.vnpy_gateway.cancelOrder(cancelOrderReq=cancel_order_req)
 
     def on_order(self, event):
         vnpy_order = event.dict_['data']
@@ -114,9 +114,7 @@ class RQVNPYEngine(object):
         order_book_id = self._data_factory.make_order_book_id(vnpy_trade.symbol)
         future_info = self._data_factory.get_future_info(order_book_id)
         if future_info is None or 'open_commission_ratio' not in future_info:
-            self.vnpy_gateway.put_query(self.vnpy_gateway.qryCommission,
-                                        symbol=vnpy_trade.symbol,
-                                        exchange=vnpy_trade.exchange)
+            self.vnpy_gateway.qryCommission(symbol=vnpy_trade.symbol, exchange=vnpy_trade.exchange)
 
         if not self._account_inited:
             self._data_factory.cache_vnpy_trade_before_init(vnpy_trade)
@@ -154,7 +152,7 @@ class RQVNPYEngine(object):
         if subscribe_req is None:
             system_log.error('Cannot find contract whose order_book_id is %s' % order_book_id)
             return
-        self.vnpy_gateway.put_query(self.vnpy_gateway.subscribe, subscribeReq=subscribe_req)
+        self.vnpy_gateway.subscribe(subscribeReq=subscribe_req)
 
     def on_tick(self, event):
         vnpy_tick = event.dict_['data']
@@ -212,9 +210,10 @@ class RQVNPYEngine(object):
         if self.gateway_type == 'CTP':
             try:
                 from .vnpy_gateway import RQVNCTPGateway
+                from .vnpy_gateway import QueryExecutor
                 self.vnpy_gateway = RQVNCTPGateway(self.event_engine, self.gateway_type,
                                                    dict(getattr(self._config, self.gateway_type)))
-                self.vnpy_gateway.start()
+                QueryExecutor.start()
             except ImportError as e:
                 system_log.exception("No Gateway named CTP")
         else:
