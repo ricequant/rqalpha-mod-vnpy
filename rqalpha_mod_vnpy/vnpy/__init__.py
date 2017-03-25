@@ -1,10 +1,6 @@
-import os
 import sys
-
-vn_trader_path = os.path.join(os.path.dirname(__file__), 'vnpy/vn.trader')
+from ..mod import vn_trader_path
 sys.path.append(vn_trader_path)
-# ctp_gateway_path = os.path.join(os.path.dirname(__file__), 'vnpy/vn.trader/ctpGateway')
-# sys.path.append(ctp_gateway_path)
 
 from vtConstant import *
 from eventEngine import EventEngine2, Event
