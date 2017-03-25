@@ -13,13 +13,12 @@ from .vnpy import STATUS_NOTTRADED, STATUS_PARTTRADED, STATUS_ALLTRADED, STATUS_
 
 from .vnpy_gateway import EVENT_POSITION_EXTRA, EVENT_CONTRACT_EXTRA, EVENT_COMMISSION, EVENT_INIT_ACCOUNT
 from .vnpy_gateway import RQVNEventEngine
-from .data_factory import AccountCache
 
 _engine = None
 
 
 class RQVNPYEngine(object):
-    def __init__(self, env, config, data_cache, data_factory):
+    def __init__(self, env, config, data_factory):
         self._env = env
         self._config = config
         self.event_engine = RQVNEventEngine()
@@ -32,9 +31,7 @@ class RQVNPYEngine(object):
         self.vnpy_gateway = None
 
         self._init_gateway()
-        self._data_cache = data_cache
         self._data_factory = data_factory
-        self._account_cache = AccountCache(data_cache)
 
         self._tick_que = Queue()
 
@@ -57,13 +54,15 @@ class RQVNPYEngine(object):
             return
 
         vnpy_order_id = self.vnpy_gateway.sendOrder(order_req)
-        self._data_cache.put_order(vnpy_order_id, order)
+        self._data_factory.cache_order(vnpy_order_id, order)
 
     def cancel_order(self, order):
         account = Environment.get_instance().get_account(order.order_book_id)
         self._env.event_bus.publish_event(Event(EVENT.ORDER_PENDING_CANCEL, account=account, order=order))
 
         cancel_order_req = self._data_factory.make_cancel_order_req(order)
+        if cancel_order_req is None:
+            system_log.warn('Cannot find VN.PY order in order cache.')
 
         self.vnpy_gateway.put_query(self.vnpy_gateway.cancelOrder, cancelOrderReq=cancel_order_req)
 
@@ -75,7 +74,7 @@ class RQVNPYEngine(object):
             return
 
         vnpy_order_id = vnpy_order.vtOrderID
-        order = self._data_cache.get_order(vnpy_order_id)
+        order = self._data_factory.get_order(vnpy_order_id)
 
         if order is not None:
             account = Environment.get_instance().get_account(order.order_book_id)
@@ -84,13 +83,14 @@ class RQVNPYEngine(object):
 
             self._env.event_bus.publish_event(Event(EVENT.ORDER_CREATION_PASS, account=account, order=order))
 
-            self._data_cache.put_vnpy_order(order.order_id, vnpy_order)
+            self._data_factory.cache_vnpy_order(order.order_id, vnpy_order)
+
             if vnpy_order.status == STATUS_NOTTRADED or vnpy_order.status == STATUS_PARTTRADED:
-                self._data_cache.put_open_order(vnpy_order_id, order)
+                self._data_factory.put_open_order(vnpy_order_id, order)
             elif vnpy_order.status == STATUS_ALLTRADED:
-                self._data_cache.del_open_order(vnpy_order_id)
+                self._data_factory.del_open_order(vnpy_order_id)
             elif vnpy_order.status == STATUS_CANCELLED:
-                self._data_cache.del_open_order(vnpy_order_id)
+                self._data_factory.del_open_order(vnpy_order_id)
                 if order.status == ORDER_STATUS.PENDING_CANCEL:
                     order.mark_cancelled("%d order has been cancelled by user." % order.order_id)
                     self._env.event_bus.publish_event(Event(EVENT.ORDER_CANCELLATION_PASS, account=account, order=order))
@@ -99,31 +99,29 @@ class RQVNPYEngine(object):
                     self._env.event_bus.publish_event(Event(EVENT.ORDER_UNSOLICITED_UPDATE, account=account, order=order))
         else:
             if not self._account_inited:
-                self._account_cache.put_vnpy_order(vnpy_order)
+                self._data_factory.cache_vnpy_order_before_init(vnpy_order)
             else:
                 system_log.error('Order from VNPY dose not match that in rqalpha')
 
     @property
     def open_orders(self):
-        return self._data_cache.open_orders
+        return self._data_factory.get_open_orders
 
     # ------------------------------------ trade生命周期 ------------------------------------
     def on_trade(self, event):
         vnpy_trade = event.dict_['data']
         system_log.debug("on_trade {}", vnpy_trade.__dict__)
         order_book_id = self._data_factory.make_order_book_id(vnpy_trade.symbol)
-        future_info = self._data_cache.get_future_info(order_book_id)
+        future_info = self._data_factory.get_future_info(order_book_id)
         if future_info is None or 'open_commission_ratio' not in future_info:
             self.vnpy_gateway.put_query(self.vnpy_gateway.qryCommission,
                                         symbol=vnpy_trade.symbol,
                                         exchange=vnpy_trade.exchange)
-        
-        order = self._data_cache.get_order(vnpy_trade.vtOrderID)
+
         if not self._account_inited:
-            self._account_cache.put_vnpy_trade(vnpy_trade)
+            self._data_factory.cache_vnpy_trade_before_init(vnpy_trade)
         else:
-            if order is None:
-                self._data_factory.make_order_from_vnpy_trade(vnpy_trade)
+            order = self._data_factory.get_order(vnpy_trade)
             trade = self._data_factory.make_trade(vnpy_trade, order.order_id)
             order.fill(trade)
             account = Environment.get_instance().get_account(order.order_book_id)
@@ -133,17 +131,17 @@ class RQVNPYEngine(object):
     def on_contract(self, event):
         contract = event.dict_['data']
         system_log.debug("on_contract {}", contract.__dict__)
-        self._data_cache.put_contract_or_extra(contract)
+        self._data_factory.cache_contract(contract)
 
     def on_contract_extra(self, event):
         contract_extra = event.dict_['data']
         system_log.debug("on_contract_extra {}", contract_extra.__dict__)
-        self._data_cache.put_contract_or_extra(contract_extra)
+        self._data_factory.cache_contract(contract_extra)
 
     def on_commission(self, event):
         commission_data = event.dict_['data']
         system_log.debug('on_commission {}', commission_data.__dict__)
-        self._data_cache.put_commission(commission_data)
+        self._data_factory.put_commission(commission_data)
 
     # ------------------------------------ tick生命周期 ------------------------------------
     def on_universe_changed(self, event):
@@ -163,7 +161,7 @@ class RQVNPYEngine(object):
         system_log.debug("on_tick {}", vnpy_tick.__dict__)
         tick = self._data_factory.make_tick(vnpy_tick)
         self._tick_que.put(tick)
-        self._data_cache.put_tick_snapshot(tick)
+        self._data_factory.put_tick_snapshot(tick)
 
     def get_tick(self):
         while True:
@@ -178,19 +176,19 @@ class RQVNPYEngine(object):
         vnpy_position = event.dict_['data']
         system_log.debug("on_positions {}", vnpy_position.__dict__)
         if not self._account_inited:
-            self._account_cache.put_vnpy_position(vnpy_position)
+            self._data_factory.cache_vnpy_position_before_init(vnpy_position)
 
     def on_position_extra(self, event):
         vnpy_position_extra = event.dict_['data']
         system_log.debug("on_position_extra {}", vnpy_position_extra.__dict__)
         if not self._account_inited:
-            self._account_cache.put_vnpy_position(vnpy_position_extra)
+            self._data_factory.cache_vnpy_position_before_init(vnpy_position_extra)
 
     def on_account(self, event):
         vnpy_account = event.dict_['data']
         system_log.debug("on_account {}", vnpy_account.__dict__)
         if not self._account_inited:
-            self._account_cache.put_vnpy_account(vnpy_account)
+            self._data_factory.cache_vnpy_account_before_init(vnpy_account)
 
     # ------------------------------------ portfolio生命周期 ------------------------------------
 
@@ -201,7 +199,7 @@ class RQVNPYEngine(object):
                 continue
 
     def get_portfolio(self):
-        future_account = self._account_cache.make_account()
+        future_account = self._data_factory.make_account_before_init()
         start_date = self._env.config.base.start_date
         return Portfolio(start_date, 1, future_account._total_cash, {ACCOUNT_TYPE.FUTURE: future_account})
 

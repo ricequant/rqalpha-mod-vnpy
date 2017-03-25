@@ -10,159 +10,30 @@ from rqalpha.model.position import Positions
 from rqalpha.model.position.future_position import FuturePosition
 from rqalpha.model.account.future_account import FutureAccount, margin_of
 from rqalpha.environment import Environment
-from rqalpha.const import ORDER_STATUS, HEDGE_TYPE, POSITION_EFFECT, COMMISSION_TYPE, SIDE, ORDER_TYPE
+from rqalpha.const import ORDER_STATUS, HEDGE_TYPE, POSITION_EFFECT, SIDE, ORDER_TYPE, COMMISSION_TYPE, MARGIN_TYPE
 from .vnpy import EXCHANGE_SHFE, OFFSET_OPEN, OFFSET_CLOSE, OFFSET_CLOSETODAY, DIRECTION_SHORT, DIRECTION_LONG
 from .vnpy import STATUS_NOTTRADED, STATUS_PARTTRADED, PRICETYPE_MARKETPRICE, PRICETYPE_LIMITPRICE, CURRENCY_CNY, PRODUCT_FUTURES
 from .vnpy import VtOrderReq, VtCancelOrderReq, VtSubscribeReq
 
 
-class AccountCache(object):
-    def __init__(self, data_cache):
-        self._account_cache = {}
-        self._position_cache = {}
+class DataCache(object):
+    def __init__(self):
+        self.order_dict = {}
+        self.open_order_dict = {}
+        self.vnpy_order_dict = {}
 
-        self._order_cache = []
+        self.order_book_id_symbol_map = {}
 
-        self._data_cache = data_cache
-        self._buy_open_cost_cache = 0.
-        self._sell_open_cost_cache = 0.
+        self.contract_cache = {}
+        self.snapshot_cache = {}
+        self.future_info_cache = {}
 
-    def put_vnpy_order(self, vnpy_order):
-        self._order_cache.append(vnpy_order)
+        self.account_cache_before_init = {}
+        self.position_cache_before_init = {}
 
-    def put_vnpy_trade(self, vnpy_trade):
-        order_book_id = DataFactory.make_order_book_id(vnpy_trade.symbol)
-        if order_book_id not in self._position_cache:
-            self._position_cache[order_book_id] = {}
-        if 'trades' not in self._position_cache[order_book_id]:
-            self._position_cache[order_book_id]['trades'] = []
-        self._position_cache[order_book_id]['trades'].append(vnpy_trade)
-
-    def put_vnpy_account(self, vnpy_account):
-        if 'preBalance' in vnpy_account.__dict__:
-            self._account_cache['yesterday_portfolio_value'] = vnpy_account.preBalance
-
-    def put_vnpy_position(self, vnpy_position):
-        order_book_id = DataFactory.make_order_book_id(vnpy_position.symbol)
-
-        if order_book_id not in self._position_cache:
-            self._position_cache[order_book_id] = {}
-
-        if vnpy_position.direction == DIRECTION_LONG:
-            if 'position' in vnpy_position.__dict__:
-                self._position_cache[order_book_id]['buy_old_quantity'] = vnpy_position.ydPosition
-                self._position_cache[order_book_id]['buy_quantity'] = vnpy_position.position
-                self._position_cache[order_book_id]['buy_today_quantity'] = vnpy_position.position - vnpy_position.ydPosition
-            if 'commission' in vnpy_position.__dict__:
-                if 'buy_transaction_cost' not in self._position_cache[order_book_id]:
-                    self._position_cache[order_book_id]['buy_transaction_cost'] = 0.
-                self._position_cache[order_book_id]['buy_transaction_cost'] += vnpy_position.commission
-            if 'closeProfit' in vnpy_position.__dict__:
-                if 'buy_realized_pnl' not in self._position_cache[order_book_id]:
-                    self._position_cache[order_book_id]['buy_realized_pnl'] = 0.
-                self._position_cache[order_book_id]['buy_realized_pnl'] += vnpy_position.closeProfit
-            if 'openCost' in vnpy_position.__dict__:
-                self._buy_open_cost_cache += vnpy_position.openCost
-                contract_multiplier = self._data_cache.get_contract(vnpy_position.symbol)['size']
-                buy_quantity = self._position_cache[order_book_id]['buy_quantity']
-                self._position_cache[order_book_id]['buy_avg_open_price'] = self._buy_open_cost_cache / (buy_quantity * contract_multiplier) if buy_quantity != 0 else 0
-
-        elif vnpy_position.direction == DIRECTION_SHORT:
-            if 'position' in vnpy_position.__dict__:
-                self._position_cache[order_book_id]['sell_old_quantity'] = vnpy_position.ydPosition
-                self._position_cache[order_book_id]['sell_position'] = vnpy_position.position
-                self._position_cache[order_book_id]['sell_today_quantity'] = vnpy_position.position - vnpy_position.ydPosition
-            if 'commission' in vnpy_position.__dict__:
-                if 'sell_transaction_cost' not in self._position_cache[order_book_id]:
-                    self._position_cache[order_book_id]['sell_transaction_cost'] = 0.
-                self._position_cache[order_book_id]['sell_transaction_cost'] += vnpy_position.commission
-            if 'closeProfit' in vnpy_position.__dict__:
-                if 'sell_realized_pnl' not in self._position_cache[order_book_id]:
-                    self._position_cache[order_book_id]['sell_realized_pnl'] = 0.
-                self._position_cache[order_book_id]['sell_realized_pnl'] += vnpy_position.closeProfit
-            if 'openCost' in vnpy_position.__dict__:
-                self._sell_open_cost_cache += vnpy_position.openCost
-                contract_multiplier = self._data_cache.get_contract(vnpy_position.symbol)['size']
-                sell_quantity = self._position_cache[order_book_id]['sell_quantity']
-                self._position_cache[order_book_id]['sell_avg_open_price'] = self._sell_open_cost_cache / (sell_quantity * contract_multiplier) if sell_quantity != 0 else 0
-
-        if 'preSettlementPrice' in vnpy_position.__dict__:
-            self._position_cache[order_book_id]['prev_settle_price'] = vnpy_position.preSettlementPrice
-
-    def _make_positions(self):
-        positions = Positions(FuturePosition)
-        for order_book_id, position_dict in iteritems(self._position_cache):
-            position = FuturePosition(order_book_id)
-            if 'prev_settle_price' in position_dict and 'buy_old_quantity' in position_dict:
-                position._buy_old_holding_list = [(position_dict['prev_settle_price'], position_dict['buy_old_quantity'])]
-            if 'prev_settle_price' in position_dict and 'sell_old_quantity' in position_dict:
-                position._sell_old_holding_list = [(position_dict['prev_settle_price'], position_dict['sell_old_quantity'])]
-
-            if 'buy_transaction_cost' in position_dict:
-                position._buy_transaction_cost = position_dict['buy_transaction_cost']
-            if 'sell_transaction_cost' in position_dict:
-                position._sell_transaction_cost = position_dict['sell_transaction_cost']
-            if 'buy_realized_pnl' in position_dict:
-                position.__buy_realized_pnl = position_dict['buy_realized_pnl']
-            if 'sell_realized_pnl' in position_dict:
-                position._sell_realized_pnl = position_dict['sell_realized_pnl']
-
-            if 'buy_avg_open_price' in position_dict:
-                position._buy_avg_open_price = position_dict['buy_avg_open_price']
-            if 'sell_avg_open_price' in position_dict:
-                position._sell_avg_open_price = position_dict['sell_avg_open_price']
-
-            if 'trades' in position_dict:
-                accum_buy_open_quantity = 0.
-                accum_sell_open_quantity = 0.
-
-                buy_today_quantity = position_dict['buy_today_quantity'] if 'buy_today_quantity' in position_dict else 0
-                sell_today_quantity = position_dict['sell_today_quantity'] if 'sell_today_quantity' in position_dict else 0
-
-                trades = sorted(position_dict['trades'], key=lambda t: parse(t.tradeTime), reverse=True)
-
-                buy_today_holding_list = []
-                sell_today_holding_list = []
-                for vnpy_trade in trades:
-                    if vnpy_trade.direction == DIRECTION_LONG:
-                        if vnpy_trade.offset == OFFSET_OPEN:
-                            accum_buy_open_quantity += vnpy_trade.volume
-                            if accum_buy_open_quantity == buy_today_quantity:
-                                break
-                            if accum_buy_open_quantity > buy_today_quantity:
-                                buy_today_holding_list.append((vnpy_trade.price, buy_today_quantity - accum_buy_open_quantity + vnpy_trade.volume))
-                                break
-                            buy_today_holding_list.append((vnpy_trade.price, vnpy_trade.volume))
-                    else:
-                        if vnpy_trade.offset == OFFSET_OPEN:
-                            accum_sell_open_quantity += vnpy_trade.volume
-                            if accum_sell_open_quantity == sell_today_quantity:
-                                break
-                            if accum_sell_open_quantity > sell_today_quantity:
-                                sell_today_holding_list.append((vnpy_trade.price, sell_today_quantity - accum_sell_open_quantity + vnpy_trade.volume))
-                                break
-                            sell_today_holding_list.append((vnpy_trade.price, vnpy_trade.volume))
-
-                position._buy_today_holding_list = buy_today_holding_list
-                position._sell_today_holding_list = sell_today_holding_list
-
-            positions[order_book_id] = position
-        return positions
-
-    def make_account(self):
-        total_cash = self._account_cache['yesterday_portfolio_value']
-        positions = self._make_positions()
-
-        account = FutureAccount(total_cash, positions)
-        frozen_cash = 0.
-        for vnpy_order in self._order_cache:
-            if vnpy_order.status == STATUS_NOTTRADED or vnpy_order.status == STATUS_PARTTRADED:
-                order_book_id = DataFactory.make_order_book_id(vnpy_order.symbol)
-                unfilled_quantity = vnpy_order.totalVolume - vnpy_order.tradedVolume
-                price = vnpy_order.price
-                frozen_cash += margin_of(order_book_id, unfilled_quantity, price)
-        account._frozen_cash = frozen_cash
-        return account
+        self.order_cache_before_init = []
+        self.buy_open_cost_cache_before_init = 0.
+        self.sell_open_cost_cache_before_init = 0.
 
 
 class DataFactory(object):
@@ -186,8 +57,8 @@ class DataFactory(object):
         POSITION_EFFECT.CLOSE: OFFSET_CLOSE,
     }
 
-    def __init__(self, data_cache):
-        self._data_cache = data_cache
+    def __init__(self):
+        self._data_cache = DataCache()
 
     @classmethod
     def make_trading_dt(cls, calendar_dt):
@@ -196,6 +67,11 @@ class DataFactory(object):
             return calendar_dt + timedelta(days=1)
         return calendar_dt
 
+    @classmethod
+    def make_underlying_symbol(cls, id_or_symbol):
+        return filter(lambda x: x not in '0123456789 ', id_or_symbol).upper()
+
+    # ------------------------------------ vnpy to rqalpha ------------------------------------
     @classmethod
     def make_position_effect(cls, vnpy_exchange, vnpy_offset):
         if vnpy_exchange == EXCHANGE_SHFE:
@@ -338,9 +214,12 @@ class DataFactory(object):
         }
         return tick
 
+    # ------------------------------------ rqalpha to vnpy ------------------------------------
     def make_order_req(self, order):
-        symbol = self._data_cache.get_symbol(order.order_book_id)
-        contract = self._data_cache.get_contract(symbol)
+        symbol = self._data_cache.order_book_id_symbol_map.get(order.order_book_id)
+        if symbol is None:
+            return None
+        contract = self._data_cache.contract_cache.get(symbol)
         if contract is None:
             return None
 
@@ -358,8 +237,9 @@ class DataFactory(object):
         return order_req
 
     def make_cancel_order_req(self, order):
-        vnpy_order = self._data_cache.get_vnpy_order(order.order_id)
-
+        vnpy_order = self._data_cache.vnpy_order_dict.get(order.order_id)
+        if vnpy_order is None:
+            return
         cancel_order_req = VtCancelOrderReq()
         cancel_order_req.symbol = vnpy_order.symbol
         cancel_order_req.exchange = vnpy_order.exchange
@@ -369,8 +249,10 @@ class DataFactory(object):
         return cancel_order_req
 
     def make_subscribe_req(self, order_book_id):
-        symbol = self._data_cache.get_symbol(order_book_id)
-        contract = self._data_cache.get_contract(symbol)
+        symbol = self._data_cache.order_book_id_symbol_map.get(order_book_id)
+        if symbol is None:
+            return None
+        contract = self._data_cache.contract_cache.get(symbol)
         if contract is None:
             return None
         subscribe_req = VtSubscribeReq()
@@ -380,3 +262,254 @@ class DataFactory(object):
         subscribe_req.currency = CURRENCY_CNY
 
         return subscribe_req
+
+    def make_positions_before_init(self):
+        positions = Positions(FuturePosition)
+        for order_book_id, position_dict in iteritems(self._data_cache.position_cache_before_init):
+            position = FuturePosition(order_book_id)
+            if 'prev_settle_price' in position_dict and 'buy_old_quantity' in position_dict:
+                position._buy_old_holding_list = [
+                    (position_dict['prev_settle_price'], position_dict['buy_old_quantity'])]
+            if 'prev_settle_price' in position_dict and 'sell_old_quantity' in position_dict:
+                position._sell_old_holding_list = [
+                    (position_dict['prev_settle_price'], position_dict['sell_old_quantity'])]
+
+            if 'buy_transaction_cost' in position_dict:
+                position._buy_transaction_cost = position_dict['buy_transaction_cost']
+            if 'sell_transaction_cost' in position_dict:
+                position._sell_transaction_cost = position_dict['sell_transaction_cost']
+            if 'buy_realized_pnl' in position_dict:
+                position.__buy_realized_pnl = position_dict['buy_realized_pnl']
+            if 'sell_realized_pnl' in position_dict:
+                position._sell_realized_pnl = position_dict['sell_realized_pnl']
+
+            if 'buy_avg_open_price' in position_dict:
+                position._buy_avg_open_price = position_dict['buy_avg_open_price']
+            if 'sell_avg_open_price' in position_dict:
+                position._sell_avg_open_price = position_dict['sell_avg_open_price']
+
+            if 'trades' in position_dict:
+                accum_buy_open_quantity = 0.
+                accum_sell_open_quantity = 0.
+
+                buy_today_quantity = position_dict[
+                    'buy_today_quantity'] if 'buy_today_quantity' in position_dict else 0
+                sell_today_quantity = position_dict[
+                    'sell_today_quantity'] if 'sell_today_quantity' in position_dict else 0
+
+                trades = sorted(position_dict['trades'], key=lambda t: parse(t.tradeTime), reverse=True)
+
+                buy_today_holding_list = []
+                sell_today_holding_list = []
+                for vnpy_trade in trades:
+                    if vnpy_trade.direction == DIRECTION_LONG:
+                        if vnpy_trade.offset == OFFSET_OPEN:
+                            accum_buy_open_quantity += vnpy_trade.volume
+                            if accum_buy_open_quantity == buy_today_quantity:
+                                break
+                            if accum_buy_open_quantity > buy_today_quantity:
+                                buy_today_holding_list.append((vnpy_trade.price,
+                                                                buy_today_quantity - accum_buy_open_quantity + vnpy_trade.volume))
+                                break
+                            buy_today_holding_list.append((vnpy_trade.price, vnpy_trade.volume))
+                    else:
+                        if vnpy_trade.offset == OFFSET_OPEN:
+                            accum_sell_open_quantity += vnpy_trade.volume
+                            if accum_sell_open_quantity == sell_today_quantity:
+                                break
+                            if accum_sell_open_quantity > sell_today_quantity:
+                                sell_today_holding_list.append((vnpy_trade.price,
+                                                                 sell_today_quantity - accum_sell_open_quantity + vnpy_trade.volume))
+                                break
+                            sell_today_holding_list.append((vnpy_trade.price, vnpy_trade.volume))
+
+                position._buy_today_holding_list = buy_today_holding_list
+                position._sell_today_holding_list = sell_today_holding_list
+
+            positions[order_book_id] = position
+        return positions
+
+    def make_account_before_init(self):
+        total_cash = self._data_cache.account_cache_before_init['yesterday_portfolio_value']
+        positions = self.make_positions_before_init()
+
+        account = FutureAccount(total_cash, positions)
+        frozen_cash = 0.
+        for vnpy_order in self._data_cache.order_cache_before_init:
+            if vnpy_order.status == STATUS_NOTTRADED or vnpy_order.status == STATUS_PARTTRADED:
+                order_book_id = DataFactory.make_order_book_id(vnpy_order.symbol)
+                unfilled_quantity = vnpy_order.totalVolume - vnpy_order.tradedVolume
+                price = vnpy_order.price
+                frozen_cash += margin_of(order_book_id, unfilled_quantity, price)
+        account._frozen_cash = frozen_cash
+        return account
+
+    # ------------------------------------ put data cache ------------------------------------
+    def cache_order(self, vnpy_order_id, order):
+        self._data_cache.order_dict[vnpy_order_id] = order
+
+    def cache_open_order(self, vnpy_order_id, order):
+        self._data_cache.open_order_dict[vnpy_order_id] = order
+
+    def cache_vnpy_order(self, order_id, vnpy_order):
+        self._data_cache.vnpy_order_dict[order_id] = vnpy_order
+
+    def cache_contract(self, contract):
+        symbol = contract.symbol
+        if symbol not in self._data_cache.contract_cache:
+            self._data_cache.contract_cache[symbol] = contract.__dict__
+        else:
+            self._data_cache.contract_cache[symbol].update(contract.__dict__)
+
+        order_book_id = self.make_order_book_id(symbol)
+        self._data_cache.order_book_id_symbol_map[order_book_id] = symbol
+
+        if 'longMarginRatio' in contract.__dict__:
+            underlying_symbol = self.make_underlying_symbol(order_book_id)
+            if underlying_symbol not in self._data_cache.future_info_cache:
+                # hard code
+                self._data_cache.future_info_cache[underlying_symbol] = {'speculation': {}}
+            self._data_cache.future_info_cache[underlying_symbol]['speculation'].update({
+                'long_margin_ratio': contract.longMarginRatio,
+                'margin_type': MARGIN_TYPE.BY_MONEY,
+            })
+        if 'shortMarginRatio' in contract.__dict__:
+            underlying_symbol = self.make_underlying_symbol(order_book_id)
+            if underlying_symbol not in self._data_cache.future_info_cache:
+                self._data_cache.future_info_cache[underlying_symbol] = {'speculation': {}}
+            self._data_cache.future_info_cache[underlying_symbol]['speculation'].update({
+                'short_margin_ratio': contract.shortMarginRatio,
+                'margin_type': MARGIN_TYPE.BY_MONEY,
+            })
+
+    def put_commission(self, commission_data):
+        underlying_symbol = self.make_underlying_symbol(commission_data.symbol)
+        if commission_data.OpenRatioByMoney == 0 and commission_data.CloseRatioByMoney == 0:
+            open_ratio = commission_data.OpenRatioByVolume
+            close_ratio = commission_data.CloseRatioByVolume
+            close_today_ratio = commission_data.CloseTodayRatioByVolume
+            if commission_data.OpenRatioByVolume != 0 or commission_data.CloseRatioByVolume != 0:
+                commission_type = COMMISSION_TYPE.BY_VOLUME
+            else:
+                commission_type = None
+        else:
+            open_ratio = commission_data.OpenRatioByMoney
+            close_ratio = commission_data.CloseRatioByMoney
+            close_today_ratio = commission_data.CloseTodayRatioByMoney
+            if commission_data.OpenRatioByVolume == 0 and commission_data.CloseRatioByVolume == 0:
+                commission_type = COMMISSION_TYPE.BY_MONEY
+            else:
+                commission_type = None
+
+        if underlying_symbol not in self._data_cache.future_info_cache:
+            self._data_cache.future_info_cache[underlying_symbol] = {'speculation': {}}
+            self._data_cache.future_info_cache[underlying_symbol]['speculation'].update({
+                'open_commission_ratio': open_ratio,
+                'close_commission_ratio': close_ratio,
+                'close_commission_today_ratio': close_today_ratio,
+                'commission_type': commission_type
+            })
+
+    def put_tick_snapshot(self, tick):
+        order_book_id = tick['order_book_id']
+        self._data_cache.snapshot_cache[order_book_id] = tick
+
+    def cache_vnpy_order_before_init(self, vnpy_order):
+        self._data_cache.order_cache_before_init.append(vnpy_order)
+
+    def cache_vnpy_trade_before_init(self, vnpy_trade):
+        order_book_id = self.make_order_book_id(vnpy_trade.symbol)
+        if order_book_id not in self._data_cache.position_cache_before_init:
+            self._data_cache.position_cache_before_init[order_book_id] = {}
+        if 'trades' not in self._data_cache.position_cache_before_init[order_book_id]:
+            self._data_cache.position_cache_before_init[order_book_id]['trades'] = []
+            self._data_cache.position_cache_before_init[order_book_id]['trades'].append(vnpy_trade)
+
+    def cache_vnpy_account_before_init(self, vnpy_account):
+        if 'preBalance' in vnpy_account.__dict__:
+            self._data_cache.account_cache_before_init['yesterday_portfolio_value'] = vnpy_account.preBalance
+
+    def cache_vnpy_position_before_init(self, vnpy_position):
+        order_book_id = self.make_order_book_id(vnpy_position.symbol)
+
+        if order_book_id not in self._data_cache.position_cache_before_init:
+            self._data_cache.position_cache_before_init[order_book_id] = {}
+
+        if vnpy_position.direction == DIRECTION_LONG:
+            if 'position' in vnpy_position.__dict__:
+                self._data_cache.position_cache_before_init[order_book_id]['buy_old_quantity'] = vnpy_position.ydPosition
+                self._data_cache.position_cache_before_init[order_book_id]['buy_quantity'] = vnpy_position.position
+                self._data_cache.position_cache_before_init[order_book_id][
+                    'buy_today_quantity'] = vnpy_position.position - vnpy_position.ydPosition
+            if 'commission' in vnpy_position.__dict__:
+                if 'buy_transaction_cost' not in self._data_cache.position_cache_before_init[order_book_id]:
+                    self._data_cache.position_cache_before_init[order_book_id]['buy_transaction_cost'] = 0.
+                self._data_cache.position_cache_before_init[order_book_id]['buy_transaction_cost'] += vnpy_position.commission
+            if 'closeProfit' in vnpy_position.__dict__:
+                if 'buy_realized_pnl' not in self._data_cache.position_cache_before_init[order_book_id]:
+                    self._data_cache.position_cache_before_init[order_book_id]['buy_realized_pnl'] = 0.
+                self._data_cache.position_cache_before_init[order_book_id]['buy_realized_pnl'] += vnpy_position.closeProfit
+            if 'openCost' in vnpy_position.__dict__:
+                self._data_cache.buy_open_cost_cache_before_init += vnpy_position.openCost
+                contract = self._data_cache.contract_cache.get(vnpy_position.symbol)
+                if contract is not None:
+                    contract_multiplier = contract['size']
+                    buy_quantity = self._data_cache.position_cache_before_init[order_book_id]['buy_quantity']
+                    self._data_cache.position_cache_before_init[order_book_id]['buy_avg_open_price'] =\
+                        self._data_cache.buy_open_cost_cache_before_init / (buy_quantity * contract_multiplier)\
+                        if buy_quantity != 0 else 0
+
+        elif vnpy_position.direction == DIRECTION_SHORT:
+            if 'position' in vnpy_position.__dict__:
+                self._data_cache.position_cache_before_init[order_book_id]['sell_old_quantity'] = vnpy_position.ydPosition
+                self._data_cache.position_cache_before_init[order_book_id]['sell_position'] = vnpy_position.position
+                self._data_cache.position_cache_before_init[order_book_id][
+                    'sell_today_quantity'] = vnpy_position.position - vnpy_position.ydPosition
+            if 'commission' in vnpy_position.__dict__:
+                if 'sell_transaction_cost' not in self._data_cache.position_cache_before_init[order_book_id]:
+                    self._data_cache.position_cache_before_init[order_book_id]['sell_transaction_cost'] = 0.
+                self._data_cache.position_cache_before_init[order_book_id]['sell_transaction_cost'] += vnpy_position.commission
+            if 'closeProfit' in vnpy_position.__dict__:
+                if 'sell_realized_pnl' not in self._data_cache.position_cache_before_init[order_book_id]:
+                    self._data_cache.position_cache_before_init[order_book_id]['sell_realized_pnl'] = 0.
+                self._data_cache.position_cache_before_init[order_book_id]['sell_realized_pnl'] += vnpy_position.closeProfit
+            if 'openCost' in vnpy_position.__dict__:
+                self._data_cache.sell_open_cost_cache_before_init += vnpy_position.openCost
+                contract = self._data_cache.contract_cache.get(vnpy_position.symbol)
+                if contract is not None:
+                    contract_multiplier = contract['size']
+                    sell_quantity = self._data_cache.position_cache_before_init[order_book_id]['sell_quantity']
+                    self._data_cache.position_cache_before_init[order_book_id]['sell_avg_open_price'] =\
+                        self._data_cache.sell_open_cost_cache_before_init / (sell_quantity * contract_multiplier)\
+                        if sell_quantity != 0 else 0
+
+        if 'preSettlementPrice' in vnpy_position.__dict__:
+            self._data_cache.position_cache_before_init[order_book_id]['prev_settle_price'] = vnpy_position.preSettlementPrice
+
+    # ------------------------------------ read data cache ------------------------------------
+    def get_order(self, vnpy_trade):
+        order = self._data_cache.order_dict.get(vnpy_trade.vtOrderID)
+        if order is None:
+            order = self.make_order_from_vnpy_trade(vnpy_trade)
+        return order
+
+    def get_open_orders(self):
+        return list(self._data_cache.open_order_dict.values())
+
+    def del_open_order(self, vnpy_order_id):
+        if vnpy_order_id in self._data_cache.open_order_dict:
+            del self._data_cache.open_order_dict[vnpy_order_id]
+
+    def get_symbol(self, order_book_id):
+        return self._data_cache.order_book_id_symbol_map.get(order_book_id)
+
+    def get_future_info(self, order_book_id, hedge_flag='speculation'):
+        underlying_symbol = self.make_underlying_symbol(order_book_id)
+        if underlying_symbol not in self._data_cache.future_info_cache:
+            return None
+        if hedge_flag not in self._data_cache.future_info_cache[underlying_symbol]:
+            return None
+        return self._data_cache.future_info_cache[underlying_symbol][hedge_flag]
+
+    def get_tick_snapshot(self, order_book_id):
+        return self._data_cache.snapshot_cache.get(order_book_id)
