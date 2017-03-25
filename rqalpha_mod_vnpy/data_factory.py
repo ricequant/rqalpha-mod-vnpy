@@ -13,7 +13,7 @@ from rqalpha.environment import Environment
 from rqalpha.const import ORDER_STATUS, HEDGE_TYPE, POSITION_EFFECT, SIDE, ORDER_TYPE, COMMISSION_TYPE, MARGIN_TYPE
 from .vnpy import EXCHANGE_SHFE, OFFSET_OPEN, OFFSET_CLOSE, OFFSET_CLOSETODAY, DIRECTION_SHORT, DIRECTION_LONG
 from .vnpy import STATUS_NOTTRADED, STATUS_PARTTRADED, PRICETYPE_MARKETPRICE, PRICETYPE_LIMITPRICE, CURRENCY_CNY, PRODUCT_FUTURES
-from .vnpy import VtOrderReq, VtCancelOrderReq, VtSubscribeReq
+from .vnpy import VtOrderReq, VtCancelOrderReq, VtSubscribeReq, VtTradeData, VtOrderData
 
 
 class DataCache(object):
@@ -487,10 +487,13 @@ class DataFactory(object):
             self._data_cache.position_cache_before_init[order_book_id]['prev_settle_price'] = vnpy_position.preSettlementPrice
 
     # ------------------------------------ read data cache ------------------------------------
-    def get_order(self, vnpy_trade):
-        order = self._data_cache.order_dict.get(vnpy_trade.vtOrderID)
+    def get_order(self, vnpy_order_or_trade):
+        order = self._data_cache.order_dict.get(vnpy_order_or_trade.vtOrderID)
         if order is None:
-            order = self.make_order_from_vnpy_trade(vnpy_trade)
+            if isinstance(vnpy_order_or_trade, VtTradeData):
+                order = self.make_order_from_vnpy_trade(vnpy_order_or_trade)
+            if isinstance(vnpy_order_or_trade, VtOrderData):
+                order = self.make_order(vnpy_order_or_trade)
         return order
 
     def get_open_orders(self):

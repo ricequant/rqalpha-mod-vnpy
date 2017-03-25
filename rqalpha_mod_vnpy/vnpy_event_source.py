@@ -84,13 +84,14 @@ class VNPYEventSource(AbstractEventSource):
                 self._time_period = TimePeriod.CLOSING
 
     def events(self, start_date, end_date, frequency):
-        while datetime.now().date() < start_date - timedelta(days=1):
-            continue
+
+        if not self._mod_config.all_day:
+            while datetime.now().date() < start_date - timedelta(days=1):
+                continue
 
         mark_time_thread = Thread(target=self.mark_time_period, args=(start_date, date.fromtimestamp(2147483647)))
         mark_time_thread.setDaemon(True)
         mark_time_thread.start()
-
         while True:
             if self._time_period == TimePeriod.BEFORE_TRADING:
                 if self._after_trading_processed:

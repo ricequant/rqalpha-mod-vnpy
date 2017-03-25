@@ -74,9 +74,11 @@ class RQVNPYEngine(object):
             return
 
         vnpy_order_id = vnpy_order.vtOrderID
-        order = self._data_factory.get_order(vnpy_order_id)
+        order = self._data_factory.get_order(vnpy_order)
 
-        if order is not None:
+        if not self._account_inited:
+            self._data_factory.cache_vnpy_order_before_init(vnpy_order)
+        else:
             account = Environment.get_instance().get_account(order.order_book_id)
 
             order.active()
@@ -86,7 +88,7 @@ class RQVNPYEngine(object):
             self._data_factory.cache_vnpy_order(order.order_id, vnpy_order)
 
             if vnpy_order.status == STATUS_NOTTRADED or vnpy_order.status == STATUS_PARTTRADED:
-                self._data_factory.put_open_order(vnpy_order_id, order)
+                self._data_factory.cache_open_order(vnpy_order_id, order)
             elif vnpy_order.status == STATUS_ALLTRADED:
                 self._data_factory.del_open_order(vnpy_order_id)
             elif vnpy_order.status == STATUS_CANCELLED:
@@ -97,11 +99,6 @@ class RQVNPYEngine(object):
                 else:
                     order.mark_rejected('Order was rejected or cancelled by vnpy.')
                     self._env.event_bus.publish_event(Event(EVENT.ORDER_UNSOLICITED_UPDATE, account=account, order=order))
-        else:
-            if not self._account_inited:
-                self._data_factory.cache_vnpy_order_before_init(vnpy_order)
-            else:
-                system_log.error('Order from VNPY dose not match that in rqalpha')
 
     @property
     def open_orders(self):
@@ -121,7 +118,6 @@ class RQVNPYEngine(object):
         else:
             order = self._data_factory.get_order(vnpy_trade)
             trade = self._data_factory.make_trade(vnpy_trade, order.order_id)
-            order.fill(trade)
             account = Environment.get_instance().get_account(order.order_book_id)
             self._env.event_bus.publish_event(Event(EVENT.TRADE, account=account, trade=trade))
 

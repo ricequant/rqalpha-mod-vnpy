@@ -296,6 +296,7 @@ class RQVNCTPGateway(CtpGateway):
     def init_account(self):
         self.qryAccount()
         self.qryPosition()
+        sleep(5)
         event = Event(type_=EVENT_INIT_ACCOUNT)
         self.eventEngine.put(event)
 
