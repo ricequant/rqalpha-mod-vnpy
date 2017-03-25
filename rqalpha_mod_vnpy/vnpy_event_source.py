@@ -18,8 +18,9 @@ class TimePeriod(Enum):
 
 # TODO: 目前只考虑了期货的场景
 class VNPYEventSource(AbstractEventSource):
-    def __init__(self, env, vnpy_engine):
+    def __init__(self, env, mod_config, vnpy_engine):
         self._env = env
+        self._mod_config = mod_config
         self._engine = vnpy_engine
         self._before_trading_processed = False
         self._after_trading_processed = False
@@ -29,12 +30,21 @@ class VNPYEventSource(AbstractEventSource):
         trading_days = self._env.data_proxy.get_trading_dates(start_date, end_date)
 
         def in_before_trading_time(time):
+            if self._mod_config.all_day:
+                return True
+
             return time.hour == 20 and time.minute < 55
 
         def in_after_trading(time):
+            if self._mod_config.all_day:
+                return True
+
             return (time.hour == 15 and time.minute >= 30) or time.hour == 16
 
         def in_trading_time(time):
+            if self._mod_config.all_day:
+                return True
+
             if time.hour < 15 or time.hour >= 21:
                 return True
             elif time.hour == 20 and time.minute >= 55:
@@ -45,6 +55,9 @@ class VNPYEventSource(AbstractEventSource):
                 return False
 
         def in_trading_day(time):
+            if self._mod_config.all_day:
+                return True
+
             if time.hour < 20:
                 if time.date() in trading_days:
                     return True
@@ -55,6 +68,9 @@ class VNPYEventSource(AbstractEventSource):
 
         while True:
             now = datetime.now()
+            if in_trading_time(now):
+                self._time_period = TimePeriod.TRADING
+                continue
             if not in_trading_day(now):
                 self._time_period = TimePeriod.CLOSING
                 continue
@@ -64,20 +80,18 @@ class VNPYEventSource(AbstractEventSource):
             if in_after_trading(now):
                 self._time_period = TimePeriod.AFTER_TRADING
                 continue
-            if in_trading_time(now):
-                self._time_period = TimePeriod.TRADING
-                continue
             else:
                 self._time_period = TimePeriod.CLOSING
 
     def events(self, start_date, end_date, frequency):
-        while datetime.now().date() < start_date - timedelta(days=1):
-            continue
+
+        if not self._mod_config.all_day:
+            while datetime.now().date() < start_date - timedelta(days=1):
+                continue
 
         mark_time_thread = Thread(target=self.mark_time_period, args=(start_date, date.fromtimestamp(2147483647)))
         mark_time_thread.setDaemon(True)
         mark_time_thread.start()
-
         while True:
             if self._time_period == TimePeriod.BEFORE_TRADING:
                 if self._after_trading_processed:

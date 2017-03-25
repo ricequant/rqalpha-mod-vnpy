@@ -2,6 +2,7 @@
 from time import sleep, time
 from Queue import Queue, Empty
 from threading import Thread
+from functools import wraps
 from .vnpy import CtpGateway, CtpTdApi, CtpMdApi, posiDirectionMapReverse
 from .vnpy import VtBaseData
 from .vnpy import EMPTY_FLOAT, EMPTY_STRING
@@ -10,9 +11,80 @@ from .vnpy import EventEngine2
 
 EVENT_POSITION_EXTRA = 'ePositionExtra'
 EVENT_CONTRACT_EXTRA = 'eContractExtra'
-EVENT_ACCOUNT_EXTRA = 'eAccountExtra'
 EVENT_COMMISSION = 'eCommission'
 EVENT_INIT_ACCOUNT = 'eAccountInit'
+
+
+def _id_gen(start=1):
+    i = start
+    while True:
+        yield i
+        i += 1
+
+
+class QueryExecutor(object):
+
+    que = Queue()
+    query_dict = {}
+    arg_dict = {}
+    ret_dict = {}
+
+    activate = False
+    interval = 1
+
+    execution_thread = None
+
+    id_gen = _id_gen()
+
+    @classmethod
+    def process(cls):
+        # TODO: 加入超时重试功能
+        while cls.activate:
+            try:
+                query_id = cls.que.get(block=True, timeout=1)
+            except Empty:
+                continue
+            query = cls.query_dict[query_id]
+            args, kwargs = cls.arg_dict[query_id]
+            cls.ret_dict[query_id] = query(*args, **kwargs)
+
+            sleep(cls.interval)
+
+    @classmethod
+    def start(cls):
+        cls.activate = True
+        cls.execution_thread = Thread(target=cls.process)
+        cls.execution_thread.start()
+
+    @classmethod
+    def stop(cls):
+        cls.activate = False
+
+    @classmethod
+    def linear_execution(cls, timeout=20):
+        def decorator(func):
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+                query_id = next(cls.id_gen)
+                block = True
+                if 'block' in kwargs:
+                    block = kwargs.pop('block')
+                cls.query_dict[query_id] = func
+                cls.arg_dict[query_id] = (args, kwargs)
+
+                cls.que.put(query_id)
+
+                if block:
+                    start_time = time()
+                    while True:
+                        if query_id in cls.ret_dict:
+                            break
+                        else:
+                            if timeout is not None:
+                                if time() - start_time > timeout:
+                                    break
+            return wrapper
+        return decorator
 
 
 # ------------------------------------ 自定义或扩展数据类型 ------------------------------------
@@ -54,16 +126,6 @@ class CommissionData(VtBaseData):
         self.CloseTodayRatioByVolume = EMPTY_FLOAT
 
 
-class AccountExtra(VtBaseData):
-    def __init__(self):
-        super(AccountExtra, self).__init__()
-
-        self.accountID = EMPTY_STRING
-        self.vtAccountID = EMPTY_STRING
-
-        self.preBalance = EMPTY_FLOAT
-
-
 # ------------------------------------ 扩展事件引擎 ------------------------------------
 class RQVNEventEngine(EventEngine2):
     def __init__(self):
@@ -92,15 +154,6 @@ class RQCTPTdApi(CtpTdApi):
     def onRspQryTradingAccount(self, data, error, n, last):
         super(RQCTPTdApi, self).onRspQryTradingAccount(data, error, n, last)
 
-        accountExtra = AccountExtra()
-        accountExtra.accountID = data['AccountID']
-        accountExtra.vtAccountID = '.'.join([self.gatewayName, accountExtra.accountID])
-
-        accountExtra.preBalance = data['PreBalance']
-        self.gateway.onAccountExtra(accountExtra)
-
-        self.gateway.status.account_success()
-
     def onRspQryInvestorPosition(self, data, error, n, last):
         super(RQCTPTdApi, self).onRspQryInvestorPosition(data, error, n, last)
 
@@ -119,8 +172,6 @@ class RQCTPTdApi(CtpTdApi):
             for posExtra in self.posExtraDict.values():
                 self.gateway.onPositionExtra(posExtra)
 
-            self.gateway.status.position_success()
-
     def onRspQryInstrument(self, data, error, n, last):
         super(RQCTPTdApi, self).onRspQryInstrument(data, error, n, last)
 
@@ -133,9 +184,40 @@ class RQCTPTdApi(CtpTdApi):
         contractExtra.shortMarginRatio = data['ShortMarginRatio']
 
         self.gateway.onContractExtra(contractExtra)
-        if last:
-            self.gateway.status.contract_success()
 
+    @QueryExecutor.linear_execution()
+    def connect(self, *args, **kwargs):
+        super(RQCTPTdApi, self).connect(*args, **kwargs)
+
+    @QueryExecutor.linear_execution()
+    def login(self, *args, **kwargs):
+        super(RQCTPTdApi, self).login(*args, **kwargs)
+
+    @QueryExecutor.linear_execution()
+    def reqSettlementInfoConfirm(self, *args, **kwargs):
+        super(RQCTPTdApi, self).reqSettlementInfoConfirm(*args, **kwargs)
+
+    @QueryExecutor.linear_execution()
+    def reqQryInstrument(self, *args, **kwargs):
+        super(RQCTPTdApi, self).reqQryInstrument(*args, **kwargs)
+
+    @QueryExecutor.linear_execution()
+    def qryAccount(self, *args, **kwargs):
+        super(RQCTPTdApi, self).qryAccount(*args, **kwargs)
+
+    @QueryExecutor.linear_execution()
+    def qryPosition(self, *args, **kwargs):
+        super(RQCTPTdApi, self).qryPosition(*args, **kwargs)
+
+    @QueryExecutor.linear_execution()
+    def sendOrder(self, *args, **kwargs):
+        super(RQCTPTdApi, self).sendOrder(*args, **kwargs)
+
+    @QueryExecutor.linear_execution()
+    def cancelOrder(self, *args, **kwargs):
+        super(RQCTPTdApi, self).cancelOrder(*args, **kwargs)
+
+    @QueryExecutor.linear_execution()
     def reqCommission(self, instrumentId, exchangeId, userId, brokerId):
         self.reqID += 1
         req = {
@@ -164,6 +246,18 @@ class RQCTPMdApi(CtpMdApi):
     def __init__(self, gateway):
         super(RQCTPMdApi, self).__init__(gateway)
 
+    @QueryExecutor.linear_execution()
+    def connect(self, *args, **kwargs):
+        super(RQCTPMdApi, self).connect(*args, **kwargs)
+
+    @QueryExecutor.linear_execution()
+    def login(self, *args, **kwargs):
+        super(RQCTPMdApi, self).login(*args, **kwargs)
+
+    @QueryExecutor.linear_execution()
+    def subscribe(self, *args, **kwargs):
+        super(RQCTPMdApi, self).subscribe(*args, **kwargs)
+
 
 # ------------------------------------ 扩展gateway ------------------------------------
 class RQVNCTPGateway(CtpGateway):
@@ -180,19 +274,7 @@ class RQVNCTPGateway(CtpGateway):
 
         self.inited = False
 
-        self.status = InitStatus()
-
         self.login_dict = login_dict
-
-        self.query_que = Queue()
-        self._activate = True
-        self._query_thread = Thread(target=self._process)
-
-    def connect_and_init_contract(self):
-        self.put_query(self.connect)
-        # self.connect(self.login_dict)
-        self.status.wait_until_contract(timeout=100)
-        self.wait_until_query_que_empty()
 
     def connect(self):
         userID = str(self.login_dict['userID'])
@@ -205,13 +287,16 @@ class RQVNCTPGateway(CtpGateway):
         self.tdApi.connect(userID, password, brokerID, tdAddress, None, None)
         self.initQuery()
 
+    def qryAccount(self):
+        super(RQVNCTPGateway, self).qryAccount()
+
+    def qryPosition(self):
+        super(RQVNCTPGateway, self).qryPosition()
+
     def init_account(self):
-        # TODO: 加入超时重试功能
-        self.put_query(self.qryAccount)
-        self.status.wait_until_account(timeout=10)
-        self.put_query(self.qryPosition)
-        self.status.wait_until_position(timeout=10)
-        self.wait_until_query_que_empty()
+        self.qryAccount()
+        self.qryPosition()
+        sleep(5)
         event = Event(type_=EVENT_INIT_ACCOUNT)
         self.eventEngine.put(event)
 
@@ -228,82 +313,18 @@ class RQVNCTPGateway(CtpGateway):
         event.dict_['data'] = contractExtra
         self.eventEngine.put(event)
 
-    def onAccountExtra(self, accountExtra):
-        event = Event(type_=EVENT_ACCOUNT_EXTRA)
-        event.dict_['data'] = accountExtra
-        self.eventEngine.put(event)
-
     def onCommission(self, commissionData):
         event = Event(type_=EVENT_COMMISSION)
         event.dict_['data'] = commissionData
         self.eventEngine.put(event)
 
-    def put_query(self, query_name, **kwargs):
-        self.query_que.put((query_name, kwargs))
+    def onRspSettlementInfoConfirm(self, data, error, n, last):
+        """确认结算信息回报"""
+        log = VtLogData()
+        log.gatewayName = self.gatewayName
+        log.logContent = u'结算信息确认完成'
+        self.gateway.onLog(log)
 
-    def _process(self):
-        while self._activate:
-            try:
-                query = self.query_que.get(block=True, timeout=1)
-            except Empty:
-                continue
-            query[0](**query[1])
-            sleep(0.8)
-
-    def start(self):
-        self._activate = True
-        self._query_thread.start()
-
-    def wait_until_query_que_empty(self):
-        while True:
-            if self.query_que.empty():
-                break
-
-
-class InitStatus(object):
-    def __init__(self):
-        self._login = False
-        self._contract = False
-        self._account = False
-        self._position = False
-
-    def _wait_until(self, which, timeout):
-        start_time = time()
-        while True:
-            which_dict = {
-                'login': self._login,
-                'contract': self._contract,
-                'account': self._account,
-                'position': self._position,
-            }
-            if which_dict[which]:
-                break
-            else:
-                if timeout is not None:
-                    if time() - start_time > timeout:
-                        break
-
-    def wait_until_login(self, timeout=None):
-        self._wait_until('login', timeout)
-
-    def login_success(self):
-        self._login = True
-
-    def wait_until_contract(self, timeout=None):
-        self._wait_until('contract', timeout)
-
-    def contract_success(self):
-        self._contract = True
-
-    def wait_until_account(self, timeout=None):
-        self._wait_until('account', timeout)
-
-    def account_success(self):
-        self._account = True
-
-    def wait_until_position(self, timeout=None):
-        self._wait_until('position', timeout)
-
-    def position_success(self):
-        self._position = True
-
+        # 查询合约代码
+        self.reqID += 1
+        self.reqQryInstrument({}, self.reqID)
