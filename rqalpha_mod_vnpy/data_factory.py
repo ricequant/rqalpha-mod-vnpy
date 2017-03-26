@@ -496,8 +496,11 @@ class DataFactory(object):
                 order = self.make_order(vnpy_order_or_trade)
         return order
 
-    def get_open_orders(self):
-        return list(self._data_cache.open_order_dict.values())
+    def get_open_orders(self, order_book_id):
+        if order_book_id is None:
+            return list(self._data_cache.open_order_dict.values())
+        else:
+            return [order for order in self._data_cache.open_order_dict.values() if order.order_book_id == order_book_id]
 
     def del_open_order(self, vnpy_order_id):
         if vnpy_order_id in self._data_cache.open_order_dict:

@@ -23,7 +23,7 @@ class VNPYMod(AbstractMod):
         self._env = env
         self._engine = RQVNPYEngine(env, mod_config, self._data_factory)
         self._engine.connect()
-        self._env.set_broker(VNPYBroker(env, self._engine))
+        self._env.set_broker(VNPYBroker(self._engine))
         self._env.set_event_source(VNPYEventSource(env, mod_config, self._engine))
         self._env.set_data_source(VNPYDataSource(env, self._data_factory))
         self._env.set_price_board(VNPYPriceBoard(self._data_factory))

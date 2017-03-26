@@ -100,9 +100,8 @@ class RQVNPYEngine(object):
                     order.mark_rejected('Order was rejected or cancelled by vnpy.')
                     self._env.event_bus.publish_event(Event(EVENT.ORDER_UNSOLICITED_UPDATE, account=account, order=order))
 
-    @property
-    def open_orders(self):
-        return self._data_factory.get_open_orders
+    def get_open_orders(self, order_book_id):
+        return self._data_factory.get_open_orders(order_book_id)
 
     # ------------------------------------ trade生命周期 ------------------------------------
     def on_trade(self, event):

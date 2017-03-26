@@ -19,13 +19,10 @@ def init_accounts(env):
 
 
 class VNPYBroker(AbstractBroker):
-    def __init__(self, env, vnpy_engine):
-        self._env = env
-
+    def __init__(self, vnpy_engine):
         self. _accounts = None
 
         self._engine = vnpy_engine
-        self._vnpy_gateway_type = self._env.config.mod.vnpy.gateway_type
 
         self._account_cache = None
 
@@ -35,7 +32,7 @@ class VNPYBroker(AbstractBroker):
     def before_trading(self):
         pass
 
-    def get_open_orders(self):
+    def get_open_orders(self, order_book_id=None):
         return self._engine.open_orders
 
     def submit_order(self, order):
