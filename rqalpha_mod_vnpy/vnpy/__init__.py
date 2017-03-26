@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import sys
 from ..mod import vn_trader_path
 sys.path.append(vn_trader_path)
