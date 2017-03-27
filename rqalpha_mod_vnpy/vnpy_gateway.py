@@ -12,7 +12,6 @@ from .vnpy import EventEngine2
 EVENT_POSITION_EXTRA = 'ePositionExtra'
 EVENT_CONTRACT_EXTRA = 'eContractExtra'
 EVENT_COMMISSION = 'eCommission'
-EVENT_INIT_ACCOUNT = 'eAccountInit'
 
 
 def _id_gen(start=1):
@@ -30,7 +29,7 @@ class QueryExecutor(object):
     ret_dict = {}
 
     activate = False
-    interval = 1
+    interval = 2
 
     execution_thread = None
 
@@ -38,7 +37,6 @@ class QueryExecutor(object):
 
     @classmethod
     def process(cls):
-        # TODO: 加入超时重试功能
         while cls.activate:
             try:
                 query_id = cls.que.get(block=True, timeout=1)
@@ -49,6 +47,15 @@ class QueryExecutor(object):
             cls.ret_dict[query_id] = query(*args, **kwargs)
 
             sleep(cls.interval)
+
+    @classmethod
+    def wait_until_query_empty(cls, timeout=600):
+        start_time = time()
+        while True:
+            if cls.que.empty():
+                break
+            elif time() - start_time > timeout:
+                break
 
     @classmethod
     def start(cls):
@@ -292,13 +299,6 @@ class RQVNCTPGateway(CtpGateway):
 
     def qryPosition(self):
         super(RQVNCTPGateway, self).qryPosition()
-
-    def init_account(self):
-        self.qryAccount()
-        self.qryPosition()
-        sleep(5)
-        event = Event(type_=EVENT_INIT_ACCOUNT)
-        self.eventEngine.put(event)
 
     def qryCommission(self, symbol, exchange):
         self.tdApi.reqCommission(symbol, exchange, self.login_dict['userID'], self.login_dict['brokerID'])

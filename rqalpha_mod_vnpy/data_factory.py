@@ -401,7 +401,8 @@ class DataFactory(object):
             else:
                 commission_type = None
 
-        if underlying_symbol not in self._data_cache.future_info_cache:
+        if underlying_symbol not in self._data_cache.future_info_cache or \
+            'open_commission_ratio' not in self._data_cache.future_info_cache[underlying_symbol]['speculation']:
             self._data_cache.future_info_cache[underlying_symbol] = {'speculation': {}}
             self._data_cache.future_info_cache[underlying_symbol]['speculation'].update({
                 'open_commission_ratio': open_ratio,
@@ -519,3 +520,6 @@ class DataFactory(object):
 
     def get_tick_snapshot(self, order_book_id):
         return self._data_cache.snapshot_cache.get(order_book_id)
+
+    def get_contract_cache(self):
+        return self._data_cache.contract_cache

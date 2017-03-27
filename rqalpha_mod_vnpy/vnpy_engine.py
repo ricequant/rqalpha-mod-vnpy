@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from Queue import Queue
 from Queue import Empty
+from time import sleep
+from six import iteritems
 
 from rqalpha.events import EVENT, Event
 from rqalpha.utils.logger import system_log
@@ -9,10 +11,10 @@ from rqalpha.model.portfolio import Portfolio
 from rqalpha.environment import Environment
 
 from .vnpy import EVENT_CONTRACT, EVENT_ORDER, EVENT_TRADE, EVENT_TICK, EVENT_LOG, EVENT_ACCOUNT, EVENT_POSITION
-from .vnpy import STATUS_NOTTRADED, STATUS_PARTTRADED, STATUS_ALLTRADED, STATUS_CANCELLED, STATUS_UNKNOWN, CURRENCY_CNY, PRODUCT_FUTURES
+from .vnpy import STATUS_NOTTRADED, STATUS_PARTTRADED, STATUS_ALLTRADED, STATUS_CANCELLED, STATUS_UNKNOWN
 
-from .vnpy_gateway import EVENT_POSITION_EXTRA, EVENT_CONTRACT_EXTRA, EVENT_COMMISSION, EVENT_INIT_ACCOUNT
-from .vnpy_gateway import RQVNEventEngine
+from .vnpy_gateway import EVENT_POSITION_EXTRA, EVENT_CONTRACT_EXTRA, EVENT_COMMISSION
+from .vnpy_gateway import RQVNEventEngine, QueryExecutor
 
 _engine = None
 
@@ -107,10 +109,10 @@ class RQVNPYEngine(object):
     def on_trade(self, event):
         vnpy_trade = event.dict_['data']
         system_log.debug("on_trade {}", vnpy_trade.__dict__)
-        order_book_id = self._data_factory.make_order_book_id(vnpy_trade.symbol)
-        future_info = self._data_factory.get_future_info(order_book_id)
-        if future_info is None or 'open_commission_ratio' not in future_info:
-            self.vnpy_gateway.qryCommission(symbol=vnpy_trade.symbol, exchange=vnpy_trade.exchange)
+        # order_book_id = self._data_factory.make_order_book_id(vnpy_trade.symbol)
+        # future_info = self._data_factory.get_future_info(order_book_id)
+        # if future_info is None or 'open_commission_ratio' not in future_info:
+        #     self.vnpy_gateway.qryCommission(symbol=vnpy_trade.symbol, exchange=vnpy_trade.exchange)
 
         if not self._account_inited:
             self._data_factory.cache_vnpy_trade_before_init(vnpy_trade)
@@ -185,19 +187,23 @@ class RQVNPYEngine(object):
 
     # ------------------------------------ portfolio生命周期 ------------------------------------
 
-    def init_account(self, block=False):
-        self.vnpy_gateway.init_account()
-        if block:
-            while not self._account_inited:
-                continue
+    def init_account(self):
+        self.vnpy_gateway.qryAccount()
+        self.vnpy_gateway.qryPosition()
+
+        for symbol, contract in iteritems(self._data_factory.get_contract_cache()):
+            order_book_id = self._data_factory.make_order_book_id(symbol)
+            future_info = self._data_factory.get_future_info(order_book_id)
+            if future_info is None or 'open_commission_ratio' not in future_info:
+                self.vnpy_gateway.qryCommission(symbol=symbol, exchange=contract['exchange'])
+
+        QueryExecutor.wait_until_query_empty()
+        self._account_inited = True
 
     def get_portfolio(self):
         future_account = self._data_factory.make_account_before_init()
         start_date = self._env.config.base.start_date
         return Portfolio(start_date, 1, future_account._total_cash, {ACCOUNT_TYPE.FUTURE: future_account})
-
-    def on_init_portfolio(self, event):
-        self._account_inited = True
 
     # ------------------------------------ gateway 和 event engine生命周期 ------------------------------------
     def _init_gateway(self):
@@ -205,9 +211,9 @@ class RQVNPYEngine(object):
         if self.gateway_type == 'CTP':
             try:
                 from .vnpy_gateway import RQVNCTPGateway
-                from .vnpy_gateway import QueryExecutor
                 self.vnpy_gateway = RQVNCTPGateway(self.event_engine, self.gateway_type,
                                                    dict(getattr(self._config, self.gateway_type)))
+                QueryExecutor.interval = self._config.query_interval
                 QueryExecutor.start()
             except ImportError as e:
                 system_log.exception("No Gateway named CTP")
@@ -232,7 +238,6 @@ class RQVNPYEngine(object):
         self.event_engine.register(EVENT_POSITION_EXTRA, self.on_position_extra)
         self.event_engine.register(EVENT_CONTRACT_EXTRA, self.on_contract_extra)
         self.event_engine.register(EVENT_COMMISSION, self.on_commission)
-        self.event_engine.register(EVENT_INIT_ACCOUNT, self.on_init_portfolio)
 
         self._env.event_bus.add_listener(EVENT.POST_UNIVERSE_CHANGED, self.on_universe_changed)
 

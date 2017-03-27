@@ -27,7 +27,7 @@ class VNPYMod(AbstractMod):
         self._env.set_event_source(VNPYEventSource(env, mod_config, self._engine))
         self._env.set_data_source(VNPYDataSource(env, self._data_factory))
         self._env.set_price_board(VNPYPriceBoard(self._data_factory))
-        self._engine.init_account(block=True)
+        self._engine.init_account()
 
     def tear_down(self, code, exception=None):
         self._engine.exit()
