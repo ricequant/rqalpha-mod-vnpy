@@ -11,8 +11,11 @@ Rqalpha 对接 vnpy 的扩展 Mod。通过启用该 Mod 来实现期货策略的
 本模块依赖 RQAlpha 和 VN.PY 两个项目，所以需要完成两个项目的安装。
 
 ### 安装 RQAlpha
- rqalpha-mod-vnpy 依赖 2.0.X 版本的 rqalpha，目前该版本的 rqalpha 仍处于 develop 状态，您可以从 [github](https://github.com/ricequant/rqalpha/) 上克隆代码、checkout 到 develop 分支，并执行 ```pip instal -e .```。  
-强烈建议您等到 rqalpha 2.0.X 发布正式版后使用 pip 进行安装。
+ rqalpha-mod-vnpy 依赖 2.0.X 版本的 rqalpha，目前该版本的 rqalpha 仍处于 develop 状态。您可以执行如下命令来安装测试版 rqalpha:
+ 
+ ```
+ pip install -U rqalpha==2.0.0b0 
+ ```
 
 ### 安装 VN.PY
  VN.PY 项目未提供 pip 安装包，所以您只能通过下载源代码自行编译的方式进行安装。详细的环境配置和安装说明您可以查看 [VN.PY官方教程](http://www.vnpy.org/pages/tutorial.html) 。
@@ -46,16 +49,27 @@ rqalpha mod uninstall vnpy
 	"gateway_type": 'CTP',
 	# VN.PY 项目目录下有一个 vn.trader 文件夹，您需要把该文件夹的路径填到此处
 	"vn_trader_path": None,
-	# 您使用 simnow 模拟交易时可以选择使用24小时服务器，该服务器允许您在收盘时间测试相关 API，如果您需要全天候测试，您需要开启此项。   	"all_day": True,
-   		# 以下是您的 CTP 账户信息，由于您需要将密码明文写在配置文件中，您需要注意保护个人隐私。   		"CTP": {      		“userID”: “”,                'password': 'c7719950218',                'brokerID': '9999',                'tdAddress': 'tcp://180.168.146.187:10030',                'mdAddress': 'tcp://180.168.146.187:10031'            },
+	# 您使用 simnow 模拟交易时可以选择使用24小时服务器，该服务器允许您在收盘时间测试相关 API，如果您需要全天候测试，您需要开启此项。
+   	"all_day": True,
+   	# 向 CTP 发送请求对时间间隔，设置过小会导致请求被吞掉
+   	"query_interval": 2,
+   	# 以下是您的 CTP 账户信息，由于您需要将密码明文写在配置文件中，您需要注意保护个人隐私。
+   	"CTP": {
+      	"userID”: '',
+      	"password": '',
+   		"brokerID": '9999,
+      	"tdAddress": 'tcp://180.168.146.187:10030',
+      	"mdAddress": 'tcp://180.168.146.187:10031'
+      	},
+   	}
 ```
 ## FAQ
-* 为什么我在使用过程中会遇到 KeyError 报错，且不能稳定复现？   
+* 为什么策略在初始化期间停滞了几十秒甚至数分钟？   
 
-	*由于CTP服务器不够稳定，有可能会遇到请求得不到响应的情况，进而影响数据的完整性，数据的不完整有可能会导致程序报错，这一现象在使用 simnow 的时候尤为严重，作者会在后续版本尝试修复这一问题。*
+	*程序在启动前，需要从 CTP 获取 Instrument 和 Commission 等数据，由于下边问题的原因，像 CTP 发送大量请求会占用很长时间。您可以将 log_level 设置成 verbose 来查看详细的回调函数执行情况。未来可能会考虑开放设置是否全量更新 commission 信息以换取更快的启动速度。*
 * 为什么我的策略逻辑的执行会有延迟？
-
-	*作者在开发的过程中发现，向CTP发送请求过于密集可能导致请求被”吞掉“，所以程序会将您发出的请求在放入队列中，依次发出，请求发送的间隔默认为1秒，这个间隔的设置会在后续版本中开放。*
+    
+    *CTP 规定所有的请求，1秒只允许发送一个。另外 CTP 对秒对计算存在误差，安全起见，1.5-2秒发送一个请求比较保险。程序会将您发出的请求在放入队列中，依次发出，请求发送的间隔默认为1.5秒，这个时间间隔您可以通过配置项中的 query_interval 自行更改。*
 * 为什么我在RQAlpha中查询到的账户、持仓信息与我通过快期、vn.trader 等终端查询到的不一致？
 
 	*本 mod 会尽力将您的账户信息恢复至 RQAlpha 中，但由于计算逻辑的不同，可能会导致各个终端显示的数字有差异，另外您通过其他终端下单交易也有可能导致数据同步的不及时。不过这也有可能是程序bug，如果您发现不一致情况严重，欢迎通过Issue的方式向作者提出。*
@@ -67,8 +81,6 @@ rqalpha mod uninstall vnpy
 ## TODO
 
 * rqalpha 和 VN.PY 开箱即用虚拟机
-* 开放CTP请求执行间隔时间的设置
 * rqalpha-mod-vnpy 的结构和数据流程图
-* 解决CTP请求未响应导致的数据不完整问题
 * 包含 VN.PY 或 vn.trader 的一键部署包
 * 接入其他接口

@@ -7,7 +7,7 @@ from setuptools import (
 
 setup(
     name='rqalpha-mod-vnpy',
-    version="0.9.6",
+    version="0.9.7",
     description='A mod for RQAlpha to connect weith VN.PY',
     packages=find_packages(exclude=[]),
     author='Cuizi7',
