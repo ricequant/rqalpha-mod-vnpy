@@ -140,9 +140,11 @@ class RQVNEventEngine(EventEngine2):
 
     def __run(self):
         """引擎运行"""
+        print('event_engine run')
         while self.__active == True:
             try:
                 event = self.__queue.get(block=True, timeout=10)  # 获取事件的阻塞时间设为1秒
+                print(str(event))
                 self.__process(event)
             except Empty:
                 pass
@@ -193,14 +195,6 @@ class RQCTPTdApi(CtpTdApi):
         self.gateway.onContractExtra(contractExtra)
 
     @QueryExecutor.linear_execution()
-    def connect(self, *args, **kwargs):
-        super(RQCTPTdApi, self).connect(*args, **kwargs)
-
-    @QueryExecutor.linear_execution()
-    def login(self, *args, **kwargs):
-        super(RQCTPTdApi, self).login(*args, **kwargs)
-
-    @QueryExecutor.linear_execution()
     def reqSettlementInfoConfirm(self, *args, **kwargs):
         super(RQCTPTdApi, self).reqSettlementInfoConfirm(*args, **kwargs)
 
@@ -215,14 +209,6 @@ class RQCTPTdApi(CtpTdApi):
     @QueryExecutor.linear_execution()
     def qryPosition(self, *args, **kwargs):
         super(RQCTPTdApi, self).qryPosition(*args, **kwargs)
-
-    @QueryExecutor.linear_execution()
-    def sendOrder(self, *args, **kwargs):
-        super(RQCTPTdApi, self).sendOrder(*args, **kwargs)
-
-    @QueryExecutor.linear_execution()
-    def cancelOrder(self, *args, **kwargs):
-        super(RQCTPTdApi, self).cancelOrder(*args, **kwargs)
 
     @QueryExecutor.linear_execution()
     def reqCommission(self, instrumentId, exchangeId, userId, brokerId):
@@ -252,14 +238,6 @@ class RQCTPTdApi(CtpTdApi):
 class RQCTPMdApi(CtpMdApi):
     def __init__(self, gateway):
         super(RQCTPMdApi, self).__init__(gateway)
-
-    @QueryExecutor.linear_execution()
-    def connect(self, *args, **kwargs):
-        super(RQCTPMdApi, self).connect(*args, **kwargs)
-
-    @QueryExecutor.linear_execution()
-    def login(self, *args, **kwargs):
-        super(RQCTPMdApi, self).login(*args, **kwargs)
 
     @QueryExecutor.linear_execution()
     def subscribe(self, *args, **kwargs):

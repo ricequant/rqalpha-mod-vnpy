@@ -6,7 +6,7 @@ sys.path.append(vn_trader_path)
 from vtConstant import *
 from eventEngine import EventEngine2, Event
 from vtGateway import VtOrderReq, VtCancelOrderReq, VtSubscribeReq, VtBaseData, VtTradeData, VtOrderData
-from eventType import EVENT_CONTRACT, EVENT_ORDER, EVENT_TRADE, EVENT_TICK, EVENT_LOG, EVENT_ACCOUNT, EVENT_POSITION
+from eventType import EVENT_CONTRACT, EVENT_ORDER, EVENT_TRADE, EVENT_TICK, EVENT_LOG, EVENT_ACCOUNT, EVENT_POSITION, EVENT_ERROR
 from ctpGateway.ctpGateway import CtpGateway, CtpMdApi, CtpTdApi, posiDirectionMapReverse
 
 __all__ = [
@@ -42,6 +42,7 @@ __all__ = [
     'EVENT_ORDER',
     'EVENT_TICK',
     'EVENT_TRADE',
+    'EVENT_ERROR',
     'CtpGateway',
     'CtpMdApi',
     'CtpTdApi',
