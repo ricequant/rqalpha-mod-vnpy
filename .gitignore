@@ -1,3 +1,14 @@
-*.pyd
-*.pyc
+/*.egg-info
+.cache/
+dist/
+.idea
+.vscode
+__pycache__
+*.bcolz
+*.pk
+*.h5
+*.c
 *.so
+*.pyc
+.coverage
+.tox
