@@ -10,7 +10,7 @@ __config__ = {
     "gateway_type": 'CTP',
     "vn_trader_path": None,
     "all_day": True,
-    "query_interval": 1.5,
+    "query_interval": 2,
     "CTP": {
         'userID': None,
         'password': None,

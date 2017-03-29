@@ -208,6 +208,7 @@ class RQVNPYEngine(object):
         QueryExecutor.wait_until_query_empty()
 
         self.vnpy_gateway.qryAccount()
+        self.vnpy_gateway.qryAccount()
         self.vnpy_gateway.qryPosition()
 
         for symbol, contract in iteritems(self._data_factory.get_contract_cache()):
@@ -217,7 +218,6 @@ class RQVNPYEngine(object):
                 self.vnpy_gateway.qryCommission(symbol=symbol, exchange=contract['exchange'])
 
         QueryExecutor.wait_until_query_empty()
-        self._account_inited = True
 
     @property
     def account_inited(self):

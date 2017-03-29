@@ -28,10 +28,8 @@ class VNPYMod(AbstractMod):
         self._event_engine = RQVNEventEngine()
         self._engine = RQVNPYEngine(env, mod_config, self._data_factory, self._event_engine)
         self._event_engine.put(Event(type_=EVENT_ENGINE_CONNECT))
-        while True:
-            if self._engine.account_inited:
-                break
-
+        sleep(10)
+        self._engine._account_inited = True
         # self._engine.connect()
         self._env.set_broker(VNPYBroker(self._engine))
         self._env.set_event_source(VNPYEventSource(env, mod_config, self._engine))
