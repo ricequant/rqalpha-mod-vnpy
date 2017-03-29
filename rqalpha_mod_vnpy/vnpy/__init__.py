@@ -15,14 +15,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-from ..mod import vn_trader_path
-sys.path.append(vn_trader_path)
-
+# noinspection PyUnresolvedReferences
 from vtConstant import *
+# noinspection PyUnresolvedReferences
 from eventEngine import EventEngine2, Event
+# noinspection PyUnresolvedReferences
 from vtGateway import VtOrderReq, VtCancelOrderReq, VtSubscribeReq, VtBaseData, VtTradeData, VtOrderData
+# noinspection PyUnresolvedReferences
 from eventType import EVENT_CONTRACT, EVENT_ORDER, EVENT_TRADE, EVENT_TICK, EVENT_LOG, EVENT_ACCOUNT, EVENT_POSITION, EVENT_ERROR
+# noinspection PyUnresolvedReferences
 from ctpGateway.ctpGateway import CtpGateway, CtpMdApi, CtpTdApi, posiDirectionMapReverse
 
 __all__ = [
