@@ -32,18 +32,17 @@ class VNPYMod(AbstractMod):
         global vn_trader_path
         vn_trader_path = mod_config.vn_trader_path
         from .data_factory import DataFactory
-        from .vnpy_engine import RQVNPYEngine, EVENT_ENGINE_CONNECT
+        from .vnpy_engine import RQVNPYEngine
         from .vnpy_event_source import VNPYEventSource
         from .vnpy_broker import VNPYBroker
         from .vnpy_data_source import VNPYDataSource
         from .vnpy_price_board import VNPYPriceBoard
         from .vnpy_gateway import RQVNEventEngine
-        from .vnpy import Event
         self._data_factory = DataFactory()
         self._env = env
         self._event_engine = RQVNEventEngine()
         self._engine = RQVNPYEngine(env, mod_config, self._data_factory, self._event_engine)
-        self._event_engine.put(Event(type_=EVENT_ENGINE_CONNECT))
+        self._engine.connect()
         sleep(10)
         self._engine._account_inited = True
         # self._engine.connect()

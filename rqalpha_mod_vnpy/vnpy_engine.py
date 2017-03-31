@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from queue import Queue, Empty
+from Queue import Queue, Empty
 from six import iteritems
 
 from rqalpha.events import EVENT, Event
@@ -28,7 +28,7 @@ from .vnpy import EVENT_CONTRACT, EVENT_ORDER, EVENT_TRADE, EVENT_TICK, EVENT_LO
 from .vnpy import STATUS_NOTTRADED, STATUS_PARTTRADED, STATUS_ALLTRADED, STATUS_CANCELLED, STATUS_UNKNOWN
 
 from .vnpy_gateway import EVENT_POSITION_EXTRA, EVENT_CONTRACT_EXTRA, EVENT_COMMISSION
-from .vnpy_gateway import RQVNEventEngine, QueryExecutor
+from .vnpy_gateway import QueryExecutor
 
 _engine = None
 EVENT_ENGINE_CONNECT = 'eEngineConnect'
@@ -217,7 +217,7 @@ class RQVNPYEngine(object):
         else:
             system_log.error('No Gateway named {}', self.gateway_type)
 
-    def connect(self, event):
+    def connect(self):
         self.vnpy_gateway.connect()
         QueryExecutor.wait_until_query_empty()
 
@@ -252,7 +252,6 @@ class RQVNPYEngine(object):
         self.event_engine.register(EVENT_POSITION_EXTRA, self.on_position_extra)
         self.event_engine.register(EVENT_CONTRACT_EXTRA, self.on_contract_extra)
         self.event_engine.register(EVENT_COMMISSION, self.on_commission)
-        self.event_engine.register(EVENT_ENGINE_CONNECT, self.connect)
         self.event_engine.register(EVENT_ERROR, lambda e: system_log.error(e['data']))
 
         self._env.event_bus.add_listener(EVENT.POST_UNIVERSE_CHANGED, self.on_universe_changed)

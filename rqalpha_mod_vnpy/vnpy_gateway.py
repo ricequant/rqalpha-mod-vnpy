@@ -16,7 +16,7 @@
 # limitations under the License.
 
 from time import sleep, time
-from queue import Queue, Empty
+from Queue import Queue, Empty
 from threading import Thread
 from functools import wraps
 from .vnpy import CtpGateway, CtpTdApi, CtpMdApi, posiDirectionMapReverse
@@ -58,7 +58,9 @@ class QueryExecutor(object):
                 query_id = cls.que.get(block=True, timeout=1)
             except Empty:
                 continue
+
             query = cls.query_dict[query_id]
+            print(str(query))
             args, kwargs = cls.arg_dict[query_id]
             cls.ret_dict[query_id] = query(*args, **kwargs)
 
@@ -211,6 +213,14 @@ class RQCTPTdApi(CtpTdApi):
         self.gateway.onContractExtra(contractExtra)
 
     @QueryExecutor.linear_execution()
+    def connect(self, *args, **kwargs):
+        super(RQCTPTdApi, self).connect(*args, **kwargs)
+
+    @QueryExecutor.linear_execution()
+    def login(self, *args, **kwargs):
+        super(RQCTPTdApi, self).login(*args, **kwargs)
+
+    @QueryExecutor.linear_execution()
     def reqSettlementInfoConfirm(self, *args, **kwargs):
         super(RQCTPTdApi, self).reqSettlementInfoConfirm(*args, **kwargs)
 
@@ -254,6 +264,14 @@ class RQCTPTdApi(CtpTdApi):
 class RQCTPMdApi(CtpMdApi):
     def __init__(self, gateway):
         super(RQCTPMdApi, self).__init__(gateway)
+
+    @QueryExecutor.linear_execution()
+    def connect(self, *args, **kwargs):
+        super(RQCTPMdApi, self).connect(*args, **kwargs)
+
+    @QueryExecutor.linear_execution()
+    def login(self, *args, **kwargs):
+        super(RQCTPMdApi, self).login(*args, **kwargs)
 
     @QueryExecutor.linear_execution()
     def subscribe(self, *args, **kwargs):
