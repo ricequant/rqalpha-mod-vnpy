@@ -16,7 +16,7 @@
 # limitations under the License.
 
 from time import sleep, time
-from queue import Queue, Empty
+from Queue import Queue, Empty
 from threading import Thread
 from functools import wraps
 from .vnpy import CtpGateway, CtpTdApi, CtpMdApi, posiDirectionMapReverse

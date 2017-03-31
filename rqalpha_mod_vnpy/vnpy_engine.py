@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from queue import Queue, Empty
+from Queue import Queue, Empty
 from six import iteritems
 
 from rqalpha.events import EVENT, Event
