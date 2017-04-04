@@ -60,7 +60,6 @@ class QueryExecutor(object):
                 continue
 
             query = cls.query_dict[query_id]
-            print(str(query))
             args, kwargs = cls.arg_dict[query_id]
             cls.ret_dict[query_id] = query(*args, **kwargs)
 
@@ -296,11 +295,11 @@ class RQVNCTPGateway(CtpGateway):
         self.login_dict = login_dict
 
     def connect(self):
-        userID = str(self.login_dict['userID'])
-        password = str(self.login_dict['password'])
-        brokerID = str(self.login_dict['brokerID'])
-        tdAddress = str(self.login_dict['tdAddress'])
-        mdAddress = str(self.login_dict['mdAddress'])
+        userID = str(self.login_dict.userID)
+        password = str(self.login_dict.password)
+        brokerID = str(self.login_dict.brokerID)
+        tdAddress = str(self.login_dict.tdAddress)
+        mdAddress = str(self.login_dict.mdAddress)
 
         self.mdApi.connect(userID, password, brokerID, mdAddress)
         self.tdApi.connect(userID, password, brokerID, tdAddress, None, None)
@@ -313,7 +312,7 @@ class RQVNCTPGateway(CtpGateway):
         super(RQVNCTPGateway, self).qryPosition()
 
     def qryCommission(self, symbol, exchange):
-        self.tdApi.reqCommission(symbol, exchange, self.login_dict['userID'], self.login_dict['brokerID'])
+        self.tdApi.reqCommission(symbol, exchange, self.login_dict.userID, self.login_dict.brokerID)
 
     def onPositionExtra(self, positionExtra):
         event = Event(type_=EVENT_POSITION_EXTRA)

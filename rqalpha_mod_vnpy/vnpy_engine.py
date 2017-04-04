@@ -208,8 +208,7 @@ class RQVNPYEngine(object):
         if self.gateway_type == 'CTP':
             try:
                 from .vnpy_gateway import RQVNCTPGateway
-                self.vnpy_gateway = RQVNCTPGateway(self.event_engine, self.gateway_type,
-                                                   dict(getattr(self._config, self.gateway_type)))
+                self.vnpy_gateway = RQVNCTPGateway(self.event_engine, self.gateway_type, getattr(self._config, self.gateway_type))
                 QueryExecutor.interval = self._config.query_interval
                 QueryExecutor.start()
             except ImportError as e:
