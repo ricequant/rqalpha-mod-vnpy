@@ -1,6 +1,8 @@
 # rqalpha-mod-vnpy
-Rqalpha 对接 vnpy 的扩展 Mod。通过启用该 Mod 来实现期货策略的实盘交易。目前本模块仍处在正式发布前的测试阶段，您可以下载参与测试并开 Issue 提交 bug，也欢迎您提交代码，参与开发。  
+RQAlpha 对接 vnpy 的扩展 Mod。通过启用该 Mod 来实现期货策略的实盘交易。目前本模块仍处在正式发布前的测试阶段，您可以下载参与测试并开 Issue 提交 bug，也欢迎您提交代码，参与开发。  
+
 ***本开源模块未进行详尽完备的测试，作者不保证您通过本模块获取到数据的完整以及准确性、不保证您的策略逻辑正确触发对应的实盘操作，您通过使用本模块实盘操作产生的损益与作者无关。***
+
 ## 环境要求
 由于 VN.PY 项目仅支持 Linux 和 Windows 系统，python2.7 环境，目前本模块也仅支持在 Linux 或 Windows 系统下 python2.7 环境。  
 作者仅在 ubuntu 16.04 LTS 系统进行了测试。关于 Windows 及其他 Linux 发行版下的兼容性，作者会在精力允许的情况进行测试，也欢迎您将兼容性情况反馈给我。
@@ -11,7 +13,7 @@ Rqalpha 对接 vnpy 的扩展 Mod。通过启用该 Mod 来实现期货策略的
 本模块依赖 RQAlpha 和 VN.PY 两个项目，所以需要完成两个项目的安装。
 
 ### 安装 RQAlpha
- rqalpha-mod-vnpy 依赖 2.0.X 版本的 rqalpha，您可以执行如下命令来安装 rqalpha
+ rqalpha-mod-vnpy 依赖 2.0.X 版本的 RQAlpha，您可以执行如下命令来安装 RQAlpha
  
  ```
  pip install -U rqalpha
@@ -21,7 +23,7 @@ Rqalpha 对接 vnpy 的扩展 Mod。通过启用该 Mod 来实现期货策略的
  VN.PY 项目未提供 pip 安装包，所以您只能通过下载源代码自行编译的方式进行安装。详细的环境配置和安装说明您可以查看 [VN.PY官方教程](http://www.vnpy.org/pages/tutorial.html) 。
  
 ### 安装 mod
-在您完成 rqalpha 的安装之后，您可以执行以下命令来安装 mod：
+在您完成 RQAlpha 的安装之后，您可以执行以下命令来安装 mod：
 
 ```
 rqalpha mod install vnpy
@@ -41,7 +43,7 @@ rqalpha mod uninstall vnpy
 
 ## 配置项
 您需要在配置项中填入 vnpy 相关文件夹的路径及您的 CTP 账号密码等信息，您可以在 [simnow 官网](http://www.simnow.com.cn) 申请实盘模拟账号。  
-配置项的使用与 rqalpha 其他 mod 无异
+配置项的使用与 RQAlpha 其他 mod 无异
 
 ```
 "vnpy": {
