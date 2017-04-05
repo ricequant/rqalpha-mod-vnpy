@@ -45,25 +45,25 @@ rqalpha mod uninstall vnpy
 您需要在配置项中填入 vnpy 相关文件夹的路径及您的 CTP 账号密码等信息，您可以在 [simnow 官网](http://www.simnow.com.cn) 申请实盘模拟账号。  
 配置项的使用与 RQAlpha 其他 mod 无异
 
-```
+``` python
 "vnpy": {
-	# 您需要接入的接口，目前仅支持 CTP
-	"gateway_type": 'CTP',
-	# VN.PY 项目目录下有一个 vn.trader 文件夹，您需要把该文件夹的路径填到此处
-	"vn_trader_path": None,
-	# 您使用 simnow 模拟交易时可以选择使用24小时服务器，该服务器允许您在收盘时间测试相关 API，如果您需要全天候测试，您需要开启此项。
-   	"all_day": True,
-   	# 向 CTP 发送请求对时间间隔，设置过小会导致请求被吞掉
-   	"query_interval": 2,
-   	# 以下是您的 CTP 账户信息，由于您需要将密码明文写在配置文件中，您需要注意保护个人隐私。
-   	"CTP": {
-      	"userID”: '',
-      	"password": '',
-   		"brokerID": '9999,
+    # 您需要接入的接口，目前仅支持 CTP
+    "gateway_type": 'CTP',
+    # VN.PY 项目目录下有一个 vn.trader 文件夹，您需要把该文件夹的路径填到此处
+    "vn_trader_path": None,
+    # 您使用 simnow 模拟交易时可以选择使用24小时服务器，该服务器允许您在收盘时间测试相关 API，如果您需要全天候测试，您需要开启此项。
+    "all_day": True,
+    # 向 CTP 发送请求对时间间隔，设置过小会导致请求被吞掉
+    "query_interval": 2,
+    # 以下是您的 CTP 账户信息，由于您需要将密码明文写在配置文件中，您需要注意保护个人隐私。
+    "CTP": {
+        "userID": '',
+        "password": '',
+        "brokerID": '9999,
       	"tdAddress": 'tcp://180.168.146.187:10030',
-      	"mdAddress": 'tcp://180.168.146.187:10031'
-      	},
-   	}
+      	"mdAddress": 'tcp://180.168.146.187:10031',
+    },
+}
 ```
 ## FAQ
 * 为什么策略在初始化期间停滞了几十秒甚至数分钟？   
