@@ -11,10 +11,10 @@ Rqalpha 对接 vnpy 的扩展 Mod。通过启用该 Mod 来实现期货策略的
 本模块依赖 RQAlpha 和 VN.PY 两个项目，所以需要完成两个项目的安装。
 
 ### 安装 RQAlpha
- rqalpha-mod-vnpy 依赖 2.0.X 版本的 rqalpha，目前该版本的 rqalpha 仍处于 develop 状态。您可以执行如下命令来安装测试版 rqalpha:
+ rqalpha-mod-vnpy 依赖 2.0.X 版本的 rqalpha，您可以执行如下命令来安装 rqalpha
  
  ```
- pip install -U rqalpha==2.0.0b0 
+ pip install -U rqalpha
  ```
 
 ### 安装 VN.PY
@@ -77,7 +77,12 @@ rqalpha mod uninstall vnpy
 * VN.PY 的环境配置和安装比较复杂，我搞不定／懒得搞怎么办？
 
 	*作者会尽力研究，争取将VN.PY的安装包含进 mod 中，通过 pip 的形式一键安装，在这之前，作者会提供一个开箱即用虚拟机镜像，供您直接下载使用。*
-	
+
+* 为什么会报 NotImplementedError？
+
+    请尝试将配置文件中的 frequency 设置为 tick。
+
+
 ## TODO
 
 * rqalpha 和 VN.PY 开箱即用虚拟机
