@@ -48,7 +48,7 @@ rqalpha mod uninstall vnpy
 ``` python
 "vnpy": {
     # 您需要接入的接口，目前仅支持 CTP
-    "gateway_type": 'CTP',
+    "gateway_type": "CTP",
     # VN.PY 项目目录下有一个 vn.trader 文件夹，您需要把该文件夹的路径填到此处
     "vn_trader_path": None,
     # 您使用 simnow 模拟交易时可以选择使用24小时服务器，该服务器允许您在收盘时间测试相关 API，如果您需要全天候测试，您需要开启此项。
@@ -57,11 +57,11 @@ rqalpha mod uninstall vnpy
     "query_interval": 2,
     # 以下是您的 CTP 账户信息，由于您需要将密码明文写在配置文件中，您需要注意保护个人隐私。
     "CTP": {
-        "userID": '',
-        "password": '',
-        "brokerID": '9999,
-      	"tdAddress": 'tcp://180.168.146.187:10030',
-      	"mdAddress": 'tcp://180.168.146.187:10031',
+        "userID": "",
+        "password": "",
+        "brokerID": "9999",
+      	"tdAddress": "tcp://180.168.146.187:10030",
+      	"mdAddress": "tcp://180.168.146.187:10031",
     },
 }
 ```
