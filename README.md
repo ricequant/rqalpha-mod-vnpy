@@ -65,6 +65,32 @@ rqalpha mod uninstall vnpy
     },
 }
 ```
+
+## 开箱即用虚拟机
+
+为了让用户能够在最短时间内体验 rqapha-mod-vnpy，免去繁琐的环境配置和接口编译，作者提供了开箱即用的虚拟机镜像。
+
+有关虚拟机镜像的导入以及 rqalpha 的调试和运行，您可以参考 [rqalpha 文档](http://rqalpha.readthedocs.io/zh_CN/latest/intro/virtual_machine.html)。
+
+[点此下载](https://pan.baidu.com/s/1boLqeGB)
+
+### 体验 rqalpha-mod-vnpy
+
+* 双击打开桌面上的 rqalpha_vnpy_test.py 文件，在配置文件对应位置填入您的 simnow userID 和密码
+
+* 打开终端，依次输入如下命令:
+```bash
+cd ﻿/home/rqalpha_user/桌面
+
+source activate py2
+
+python rqalpha_vnpy_test.py
+
+```
+
+
+
+
 ## FAQ
 * 为什么策略在初始化期间停滞了几十秒甚至数分钟？   
 
