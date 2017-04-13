@@ -251,7 +251,7 @@ class RQVNPYEngine(object):
         self.event_engine.register(EVENT_POSITION_EXTRA, self.on_position_extra)
         self.event_engine.register(EVENT_CONTRACT_EXTRA, self.on_contract_extra)
         self.event_engine.register(EVENT_COMMISSION, self.on_commission)
-        self.event_engine.register(EVENT_ERROR, lambda e: system_log.error(e['data']))
+        self.event_engine.register(EVENT_ERROR, lambda e: system_log.error(e.dict_['data']))
 
         self._env.event_bus.add_listener(EVENT.POST_UNIVERSE_CHANGED, self.on_universe_changed)
 

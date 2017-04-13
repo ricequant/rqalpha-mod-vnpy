@@ -113,7 +113,6 @@ python rqalpha_vnpy_test.py
 
 ## TODO
 
-* rqalpha 和 VN.PY 开箱即用虚拟机
 * rqalpha-mod-vnpy 的结构和数据流程图
 * 包含 VN.PY 或 vn.trader 的一键部署包
 * 接入其他接口
