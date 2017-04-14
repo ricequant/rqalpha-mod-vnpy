@@ -58,6 +58,7 @@ class QueryExecutor(object):
                 query_id = cls.que.get(block=True, timeout=1)
             except Empty:
                 continue
+
             query = cls.query_dict[query_id]
             args, kwargs = cls.arg_dict[query_id]
             cls.ret_dict[query_id] = query(*args, **kwargs)
@@ -211,6 +212,14 @@ class RQCTPTdApi(CtpTdApi):
         self.gateway.onContractExtra(contractExtra)
 
     @QueryExecutor.linear_execution()
+    def connect(self, *args, **kwargs):
+        super(RQCTPTdApi, self).connect(*args, **kwargs)
+
+    @QueryExecutor.linear_execution()
+    def login(self, *args, **kwargs):
+        super(RQCTPTdApi, self).login(*args, **kwargs)
+
+    @QueryExecutor.linear_execution()
     def reqSettlementInfoConfirm(self, *args, **kwargs):
         super(RQCTPTdApi, self).reqSettlementInfoConfirm(*args, **kwargs)
 
@@ -256,6 +265,14 @@ class RQCTPMdApi(CtpMdApi):
         super(RQCTPMdApi, self).__init__(gateway)
 
     @QueryExecutor.linear_execution()
+    def connect(self, *args, **kwargs):
+        super(RQCTPMdApi, self).connect(*args, **kwargs)
+
+    @QueryExecutor.linear_execution()
+    def login(self, *args, **kwargs):
+        super(RQCTPMdApi, self).login(*args, **kwargs)
+
+    @QueryExecutor.linear_execution()
     def subscribe(self, *args, **kwargs):
         super(RQCTPMdApi, self).subscribe(*args, **kwargs)
 
@@ -278,11 +295,11 @@ class RQVNCTPGateway(CtpGateway):
         self.login_dict = login_dict
 
     def connect(self):
-        userID = str(self.login_dict['userID'])
-        password = str(self.login_dict['password'])
-        brokerID = str(self.login_dict['brokerID'])
-        tdAddress = str(self.login_dict['tdAddress'])
-        mdAddress = str(self.login_dict['mdAddress'])
+        userID = str(self.login_dict.userID)
+        password = str(self.login_dict.password)
+        brokerID = str(self.login_dict.brokerID)
+        tdAddress = str(self.login_dict.tdAddress)
+        mdAddress = str(self.login_dict.mdAddress)
 
         self.mdApi.connect(userID, password, brokerID, mdAddress)
         self.tdApi.connect(userID, password, brokerID, tdAddress, None, None)
@@ -295,7 +312,7 @@ class RQVNCTPGateway(CtpGateway):
         super(RQVNCTPGateway, self).qryPosition()
 
     def qryCommission(self, symbol, exchange):
-        self.tdApi.reqCommission(symbol, exchange, self.login_dict['userID'], self.login_dict['brokerID'])
+        self.tdApi.reqCommission(symbol, exchange, self.login_dict.userID, self.login_dict.brokerID)
 
     def onPositionExtra(self, positionExtra):
         event = Event(type_=EVENT_POSITION_EXTRA)

@@ -479,7 +479,7 @@ class DataFactory(object):
         elif vnpy_position.direction == DIRECTION_SHORT:
             if 'position' in vnpy_position.__dict__:
                 self._data_cache.position_cache_before_init[order_book_id]['sell_old_quantity'] = vnpy_position.ydPosition
-                self._data_cache.position_cache_before_init[order_book_id]['sell_position'] = vnpy_position.position
+                self._data_cache.position_cache_before_init[order_book_id]['sell_quantity'] = vnpy_position.position
                 self._data_cache.position_cache_before_init[order_book_id][
                     'sell_today_quantity'] = vnpy_position.position - vnpy_position.ydPosition
             if 'commission' in vnpy_position.__dict__:
