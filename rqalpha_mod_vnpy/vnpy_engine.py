@@ -27,8 +27,8 @@ from rqalpha.environment import Environment
 from .vnpy import EVENT_CONTRACT, EVENT_ORDER, EVENT_TRADE, EVENT_TICK, EVENT_LOG, EVENT_ACCOUNT, EVENT_POSITION, EVENT_ERROR
 from .vnpy import STATUS_NOTTRADED, STATUS_PARTTRADED, STATUS_ALLTRADED, STATUS_CANCELLED, STATUS_UNKNOWN
 
-from .vnpy_gateway import EVENT_POSITION_EXTRA, EVENT_CONTRACT_EXTRA, EVENT_COMMISSION
-from .vnpy_gateway import QueryExecutor
+from .vnpy_gateway import EVENT_COMMISSION
+from .ctp_gateway import RQCtpGateway
 
 _engine = None
 EVENT_ENGINE_CONNECT = 'eEngineConnect'
@@ -86,7 +86,7 @@ class RQVNPYEngine(object):
     def on_order(self, event):
         vnpy_order = event.dict_['data']
         system_log.debug("on_order {}", vnpy_order.__dict__)
-        # FIXME 发现订单会重复返回，此操作是否会导致订单丢失有待验证
+
         if vnpy_order.status == STATUS_UNKNOWN:
             return
 
@@ -135,14 +135,10 @@ class RQVNPYEngine(object):
 
     # ------------------------------------ instrument生命周期 ------------------------------------
     def on_contract(self, event):
-        contract = event.dict_['data']
-        system_log.debug("on_contract {}", contract.__dict__)
-        self._data_factory.cache_contract(contract)
-
-    def on_contract_extra(self, event):
-        contract_extra = event.dict_['data']
-        system_log.debug("on_contract_extra {}", contract_extra.__dict__)
-        self._data_factory.cache_contract(contract_extra)
+        contract_dict = event.dict_['data']
+        system_log.debug("on_contract {}", len(contract_dict))
+        for _, contract in iteritems(contract_dict):
+            self._data_factory.cache_contract(contract)
 
     def on_commission(self, event):
         commission_data = event.dict_['data']
@@ -179,16 +175,11 @@ class RQVNPYEngine(object):
 
     # ------------------------------------ account生命周期 ------------------------------------
     def on_positions(self, event):
-        vnpy_position = event.dict_['data']
-        system_log.debug("on_positions {}", vnpy_position.__dict__)
+        vnpy_position_dict = event.dict_['data']
+        system_log.debug("on_positions {}", vnpy_position_dict.keys())
         if not self._account_inited:
-            self._data_factory.cache_vnpy_position_before_init(vnpy_position)
-
-    def on_position_extra(self, event):
-        vnpy_position_extra = event.dict_['data']
-        system_log.debug("on_position_extra {}", vnpy_position_extra.__dict__)
-        if not self._account_inited:
-            self._data_factory.cache_vnpy_position_before_init(vnpy_position_extra)
+            for _, vnpy_position in iteritems(vnpy_position_dict):
+                self._data_factory.cache_vnpy_position_before_init(vnpy_position)
 
     def on_account(self, event):
         vnpy_account = event.dict_['data']
@@ -206,31 +197,20 @@ class RQVNPYEngine(object):
     def _init_gateway(self):
         self.gateway_type = self._config.gateway_type
         if self.gateway_type == 'CTP':
-            try:
-                from .vnpy_gateway import RQVNCTPGateway
-                self.vnpy_gateway = RQVNCTPGateway(self.event_engine, self.gateway_type, getattr(self._config, self.gateway_type))
-                QueryExecutor.interval = self._config.query_interval
-                QueryExecutor.start()
-            except ImportError as e:
-                system_log.exception("No Gateway named CTP")
+            self.vnpy_gateway = RQCtpGateway(self.event_engine, self.gateway_type, getattr(self._config, self.gateway_type))
         else:
             system_log.error('No Gateway named {}', self.gateway_type)
 
     def connect(self):
         self.vnpy_gateway.connect()
-        QueryExecutor.wait_until_query_empty()
+        self.vnpy_gateway.qrySettlementInfoConfirm()
+        self.vnpy_gateway.qryContract()
 
         self.vnpy_gateway.qryAccount()
         self.vnpy_gateway.qryAccount()
         self.vnpy_gateway.qryPosition()
 
-        for symbol, contract in iteritems(self._data_factory.get_contract_cache()):
-            order_book_id = self._data_factory.make_order_book_id(symbol)
-            future_info = self._data_factory.get_future_info(order_book_id)
-            if future_info is None or 'open_commission_ratio' not in future_info:
-                self.vnpy_gateway.qryCommission(symbol=symbol, exchange=contract['exchange'])
-
-        QueryExecutor.wait_until_query_empty()
+        self.vnpy_gateway.qryCommission(self._data_factory.get_contract_cache().keys())
 
     @property
     def account_inited(self):
@@ -248,8 +228,6 @@ class RQVNPYEngine(object):
         self.event_engine.register(EVENT_LOG, self.on_log)
         self.event_engine.register(EVENT_ACCOUNT, self.on_account)
         self.event_engine.register(EVENT_POSITION, self.on_positions)
-        self.event_engine.register(EVENT_POSITION_EXTRA, self.on_position_extra)
-        self.event_engine.register(EVENT_CONTRACT_EXTRA, self.on_contract_extra)
         self.event_engine.register(EVENT_COMMISSION, self.on_commission)
         self.event_engine.register(EVENT_ERROR, lambda e: system_log.error(e.dict_['data']))
 

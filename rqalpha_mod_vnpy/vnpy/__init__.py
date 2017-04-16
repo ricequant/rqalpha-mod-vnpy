@@ -15,16 +15,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# noinspection PyUnresolvedReferences
+import sys
+from ..mod import vn_trader_path
+sys.path.append(vn_trader_path)
+
 from vtConstant import *
-# noinspection PyUnresolvedReferences
 from eventEngine import EventEngine2, Event
-# noinspection PyUnresolvedReferences
-from vtGateway import VtOrderReq, VtCancelOrderReq, VtSubscribeReq, VtBaseData, VtTradeData, VtOrderData
-# noinspection PyUnresolvedReferences
+from vtGateway import VtOrderReq, VtCancelOrderReq, VtSubscribeReq, VtBaseData, VtTradeData, VtOrderData, VtPositionData, VtContractData
 from eventType import EVENT_CONTRACT, EVENT_ORDER, EVENT_TRADE, EVENT_TICK, EVENT_LOG, EVENT_ACCOUNT, EVENT_POSITION, EVENT_ERROR
-# noinspection PyUnresolvedReferences
-from ctpGateway.ctpGateway import CtpGateway, CtpMdApi, CtpTdApi, posiDirectionMapReverse
+from gateway.ctpGateway.ctpGateway import CtpGateway, CtpMdApi, CtpTdApi, posiDirectionMapReverse, EXCHANGE_SHFE, EXCHANGE_UNKNOWN, exchangeMapReverse, productClassMapReverse, OPTION_CALL, OPTION_PUT, PRODUCT_UNKNOWN
 
 __all__ = [
     'EXCHANGE_SHFE',
@@ -51,6 +50,7 @@ __all__ = [
     'VtBaseData',
     'VtOrderData',
     'VtTradeData',
+    'VtPositionData',
     'VtSubscribeReq',
     'EVENT_POSITION',
     'EVENT_ACCOUNT',
@@ -60,8 +60,16 @@ __all__ = [
     'EVENT_TICK',
     'EVENT_TRADE',
     'EVENT_ERROR',
+    'EXCHANGE_SHFE',
+    'EXCHANGE_UNKNOWN',
     'CtpGateway',
     'CtpMdApi',
     'CtpTdApi',
     'posiDirectionMapReverse',
+    'exchangeMapReverse',
+    'VtContractData',
+    'productClassMapReverse',
+    'OPTION_CALL',
+    'OPTION_PUT',
+    'PRODUCT_UNKNOWN',
 ]
