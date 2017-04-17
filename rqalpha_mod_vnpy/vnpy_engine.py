@@ -185,9 +185,8 @@ class RQVNPYEngine(object):
     def on_positions(self, event):
         vnpy_position_dict = event.dict_['data']
         system_log.debug("on_positions {}", vnpy_position_dict.keys())
-        if not self._account_inited:
-            for _, vnpy_position in iteritems(vnpy_position_dict):
-                self._data_factory.cache_vnpy_position_before_init(vnpy_position)
+        for _, vnpy_position in iteritems(vnpy_position_dict):
+            self._data_factory.cache_vnpy_position(vnpy_position)
 
     def on_account(self, event):
         vnpy_account = event.dict_['data']

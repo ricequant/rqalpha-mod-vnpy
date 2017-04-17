@@ -40,8 +40,8 @@ class DataCache(object):
         self.snapshot_cache = {}
         self.future_info_cache = {}
 
-        self.account_cache_before_init = {}
-        self.position_cache_before_init = {}
+        self.account_cache = {}
+        self.position_cache = {}
 
         self.order_cache_before_init = []
 
@@ -99,9 +99,9 @@ class DataFactory(object):
 
         return subscribe_req
 
-    def make_positions_before_init(self):
+    def make_positions(self):
         positions = Positions(FuturePosition)
-        for order_book_id, position_dict in iteritems(self._data_cache.position_cache_before_init):
+        for order_book_id, position_dict in iteritems(self._data_cache.position_cache):
             position = FuturePosition(order_book_id)
             if 'prev_settle_price' in position_dict and 'buy_old_quantity' in position_dict:
                 position._buy_old_holding_list = [
@@ -165,9 +165,9 @@ class DataFactory(object):
             positions[order_book_id] = position
         return positions
 
-    def make_account_before_init(self):
-        total_cash = self._data_cache.account_cache_before_init['yesterday_portfolio_value']
-        positions = self.make_positions_before_init()
+    def make_account(self):
+        total_cash = self._data_cache.account_cache['yesterday_portfolio_value']
+        positions = self.make_positions()
 
         account = FutureAccount(total_cash, positions)
         frozen_cash = 0.
@@ -256,40 +256,40 @@ class DataFactory(object):
 
     def cache_vnpy_trade_before_init(self, vnpy_trade):
         order_book_id = make_order_book_id(vnpy_trade.symbol)
-        if order_book_id not in self._data_cache.position_cache_before_init:
-            self._data_cache.position_cache_before_init[order_book_id] = {}
-        if 'trades' not in self._data_cache.position_cache_before_init[order_book_id]:
-            self._data_cache.position_cache_before_init[order_book_id]['trades'] = []
-            self._data_cache.position_cache_before_init[order_book_id]['trades'].append(vnpy_trade)
+        if order_book_id not in self._data_cache.position_cache:
+            self._data_cache.position_cache[order_book_id] = {}
+        if 'trades' not in self._data_cache.position_cache[order_book_id]:
+            self._data_cache.position_cache[order_book_id]['trades'] = []
+            self._data_cache.position_cache[order_book_id]['trades'].append(vnpy_trade)
 
     def cache_vnpy_account_before_init(self, vnpy_account):
         if 'preBalance' in vnpy_account.__dict__:
-            self._data_cache.account_cache_before_init['yesterday_portfolio_value'] = vnpy_account.preBalance
+            self._data_cache.account_cache['yesterday_portfolio_value'] = vnpy_account.preBalance
 
-    def cache_vnpy_position_before_init(self, vnpy_position):
+    def cache_vnpy_position(self, vnpy_position):
         order_book_id = make_order_book_id(vnpy_position.symbol)
 
-        if order_book_id not in self._data_cache.position_cache_before_init:
-            self._data_cache.position_cache_before_init[order_book_id] = {}
+        if order_book_id not in self._data_cache.position_cache:
+            self._data_cache.position_cache[order_book_id] = {}
 
         if vnpy_position.direction == DIRECTION_LONG:
-            self._data_cache.position_cache_before_init[order_book_id]['buy_old_quantity'] = vnpy_position.ydPosition
-            self._data_cache.position_cache_before_init[order_book_id]['buy_quantity'] = vnpy_position.position
-            self._data_cache.position_cache_before_init[order_book_id]['buy_today_quantity'] = vnpy_position.todayPosition
-            self._data_cache.position_cache_before_init[order_book_id]['buy_transaction_cost'] = vnpy_position.commission
-            self._data_cache.position_cache_before_init[order_book_id]['buy_realized_pnl'] = vnpy_position.closeProfit
-            self._data_cache.position_cache_before_init[order_book_id]['buy_avg_open_price'] = vnpy_position.avgOpenPrice
+            self._data_cache.position_cache[order_book_id]['buy_old_quantity'] = vnpy_position.ydPosition
+            self._data_cache.position_cache[order_book_id]['buy_quantity'] = vnpy_position.position
+            self._data_cache.position_cache[order_book_id]['buy_today_quantity'] = vnpy_position.todayPosition
+            self._data_cache.position_cache[order_book_id]['buy_transaction_cost'] = vnpy_position.commission
+            self._data_cache.position_cache[order_book_id]['buy_realized_pnl'] = vnpy_position.closeProfit
+            self._data_cache.position_cache[order_book_id]['buy_avg_open_price'] = vnpy_position.avgOpenPrice
 
         elif vnpy_position.direction == DIRECTION_SHORT:
-            self._data_cache.position_cache_before_init[order_book_id]['sell_old_quantity'] = vnpy_position.ydPosition
-            self._data_cache.position_cache_before_init[order_book_id]['sell_quantity'] = vnpy_position.position
-            self._data_cache.position_cache_before_init[order_book_id]['sell_today_quantity'] = vnpy_position.todayPosition
-            self._data_cache.position_cache_before_init[order_book_id]['sell_transaction_cost'] = vnpy_position.commission
-            self._data_cache.position_cache_before_init[order_book_id]['sell_realized_pnl'] = vnpy_position.closeProfit
-            self._data_cache.position_cache_before_init[order_book_id]['sell_avg_open_price'] = vnpy_position.avgOpenPrice
+            self._data_cache.position_cache[order_book_id]['sell_old_quantity'] = vnpy_position.ydPosition
+            self._data_cache.position_cache[order_book_id]['sell_quantity'] = vnpy_position.position
+            self._data_cache.position_cache[order_book_id]['sell_today_quantity'] = vnpy_position.todayPosition
+            self._data_cache.position_cache[order_book_id]['sell_transaction_cost'] = vnpy_position.commission
+            self._data_cache.position_cache[order_book_id]['sell_realized_pnl'] = vnpy_position.closeProfit
+            self._data_cache.position_cache[order_book_id]['sell_avg_open_price'] = vnpy_position.avgOpenPrice
 
         if 'preSettlementPrice' in vnpy_position.__dict__:
-            self._data_cache.position_cache_before_init[order_book_id]['prev_settle_price'] = vnpy_position.preSettlementPrice
+            self._data_cache.position_cache[order_book_id]['prev_settle_price'] = vnpy_position.preSettlementPrice
 
     # ------------------------------------ read data cache ------------------------------------
     def get_order(self, vnpy_order_or_trade):
