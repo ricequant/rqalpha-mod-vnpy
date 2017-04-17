@@ -236,10 +236,12 @@ class RqCtpTdApi(CtpTdApi):
             pos.direction = posiDirectionMapReverse.get(data['PosiDirection'], '')
             pos.vtPositionName = '.'.join([pos.vtSymbol, pos.direction])
 
-        if data['YdPosition'] and not data['TodayPosition']:
-            pos.ydPosition = data['Position']
-
         cost = pos.price * pos.position
+
+        if data['YdPosition']:
+            pos.ydPosition = data['Position']
+        if data['TodayPosition']:
+            pos.todayPosition = data['TodayPosition']
 
         pos.position += data['Position']
         pos.positionProfit += data['PositionProfit']
@@ -328,6 +330,10 @@ class RqCtpTdApi(CtpTdApi):
     def onErrRtnOrderAction(self, data, error):
         system_log.error('CTP交易服务器撤单错误，错误代码：%s，错误信息：%s' % (str(error['ErrorID']), error['ErrorMsg'].decode('gbk')))
 
+    def onRspQryDepthMarketData(self, data, error, n, last):
+
+        pass
+
     def qrySettlementInfoConfirm(self):
         # 登录成功后应确认结算信息
         req = {}
@@ -349,3 +355,11 @@ class RqCtpTdApi(CtpTdApi):
             'ExchangeID': self.symbolExchangeDict.get(instrumentId, EXCHANGE_UNKNOWN)
         }
         self.reqQryInstrumentCommissionRate(req, self.reqID)
+
+    def qryMarketData(self, instrumentId):
+        self.reqID += 1
+        req = {
+            'InstrumentID': instrumentId,
+            'ExchangeID': self.symbolExchangeDict.get(instrumentId, EXCHANGE_UNKNOWN)
+        }
+        self.reqQryDepthMarketData(req, self.reqID)

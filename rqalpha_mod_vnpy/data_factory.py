@@ -449,8 +449,7 @@ class DataFactory(object):
         if vnpy_position.direction == DIRECTION_LONG:
             self._data_cache.position_cache_before_init[order_book_id]['buy_old_quantity'] = vnpy_position.ydPosition
             self._data_cache.position_cache_before_init[order_book_id]['buy_quantity'] = vnpy_position.position
-            self._data_cache.position_cache_before_init[order_book_id][
-                    'buy_today_quantity'] = vnpy_position.position - vnpy_position.ydPosition
+            self._data_cache.position_cache_before_init[order_book_id]['buy_today_quantity'] = vnpy_position.todayPosition
             self._data_cache.position_cache_before_init[order_book_id]['buy_transaction_cost'] = vnpy_position.commission
             self._data_cache.position_cache_before_init[order_book_id]['buy_realized_pnl'] = vnpy_position.closeProfit
             self._data_cache.position_cache_before_init[order_book_id]['buy_avg_open_price'] = vnpy_position.avgOpenPrice
@@ -458,8 +457,7 @@ class DataFactory(object):
         elif vnpy_position.direction == DIRECTION_SHORT:
             self._data_cache.position_cache_before_init[order_book_id]['sell_old_quantity'] = vnpy_position.ydPosition
             self._data_cache.position_cache_before_init[order_book_id]['sell_quantity'] = vnpy_position.position
-            self._data_cache.position_cache_before_init[order_book_id][
-                    'sell_today_quantity'] = vnpy_position.position - vnpy_position.ydPosition
+            self._data_cache.position_cache_before_init[order_book_id]['sell_today_quantity'] = vnpy_position.todayPosition
             self._data_cache.position_cache_before_init[order_book_id]['sell_transaction_cost'] = vnpy_position.commission
             self._data_cache.position_cache_before_init[order_book_id]['sell_realized_pnl'] = vnpy_position.closeProfit
             self._data_cache.position_cache_before_init[order_book_id]['sell_avg_open_price'] = vnpy_position.avgOpenPrice
