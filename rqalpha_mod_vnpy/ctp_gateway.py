@@ -15,15 +15,17 @@
 # limitations under the License.
 
 from time import sleep
+from tqdm import tqdm
 from rqalpha.utils.logger import system_log
 
 from .vnpy import *
 from .vnpy_gateway import RQPositionData, RQContractData, RQCommissionData, EVENT_COMMISSION
+from .util import make_underlying_symbol
 
 
 class RQCtpGateway(CtpGateway):
 
-    def __init__(self, event_engine, gateway_name, login_dict, retry_times=10, retry_interval=1.8):
+    def __init__(self, event_engine, gateway_name, login_dict, retry_times=3, retry_interval=1):
         super(CtpGateway, self).__init__(event_engine, gateway_name)
 
         self.login_dict = login_dict
@@ -67,8 +69,8 @@ class RQCtpGateway(CtpGateway):
         self._contract_received = True
 
     def onCommission(self, commission):
-        if commission.symbol not in self._commission_buffer:
-            self._commission_buffer[commission.symbol] = commission
+        underlying_symbol = make_underlying_symbol(commission.symbol)
+        self._commission_buffer[underlying_symbol] = commission
 
     def connect(self):
         userID = str(self.login_dict.userID)
@@ -81,14 +83,13 @@ class RQCtpGateway(CtpGateway):
             if self.mdApi.loginStatus:
                 break
             self.mdApi.connect(userID, password, brokerID, mdAddress)
-            sleep(self._retry_interval)
+            sleep(self._retry_interval * (i+1))
         
         for i in range(self._retry_times):
             if self.tdApi.loginStatus:
                 break
             self.tdApi.connect(userID, password, brokerID, tdAddress, None, None)
-            sleep(self._retry_interval)
-        
+            sleep(self._retry_interval * (i+1))
         self.initQuery()
 
     def qrySettlementInfoConfirm(self):
@@ -96,7 +97,7 @@ class RQCtpGateway(CtpGateway):
         for i in range(self._retry_times):
             if not self._settlement_info_confirmed:
                 self.tdApi.qrySettlementInfoConfirm()
-                sleep(self._retry_interval)
+                sleep(self._retry_interval * (i+1))
 
     def qryAccount(self):
         self._account_received = False
@@ -104,7 +105,7 @@ class RQCtpGateway(CtpGateway):
             if self._account_received:
                 break
             super(RQCtpGateway, self).qryAccount()
-            sleep(self._retry_interval)
+            sleep(self._retry_interval * (i+1))
 
     def qryPosition(self):
         self._position_received = False
@@ -112,7 +113,7 @@ class RQCtpGateway(CtpGateway):
             if self._position_received:
                 break
             super(RQCtpGateway, self).qryPosition()
-            sleep(self._retry_interval)
+            sleep(self._retry_interval * (i+1))
 
     def qryContract(self):
         self._contract_received = False
@@ -120,20 +121,21 @@ class RQCtpGateway(CtpGateway):
             if self._contract_received:
                 break
             self.tdApi.qryInstrument()
-            sleep(self._retry_interval)
+            sleep(self._retry_interval * (i+1))
 
     def qryCommission(self, symbol_list):
         self._commission_buffer = {}
         for i in range(self._retry_times):
-            if len(symbol_list) == len(self._commission_buffer):
-                event = Event(type_=EVENT_COMMISSION)
-                event.dict_['data'] = self._commission_buffer
-                self.eventEngine.put(event)
-                break
+            symbol_list = [symbol for symbol in symbol_list if make_underlying_symbol(symbol) not in self._commission_buffer]
+
             for symbol in symbol_list:
-                if symbol not in self._commission_buffer:
+                if make_underlying_symbol(symbol) not in self._commission_buffer:
                     self.tdApi.qryCommission(symbol)
-                    sleep(self._retry_interval)
+                    sleep(self._retry_interval * (i+1))
+
+        event = Event(type_=EVENT_COMMISSION)
+        event.dict_['data'] = self._commission_buffer
+        self.eventEngine.put(event)
 
 
 class RqCtpMdApi(CtpMdApi):
@@ -216,7 +218,7 @@ class RqCtpTdApi(CtpTdApi):
     def onRspSettlementInfoConfirm(self, data, error, n, last):
         system_log.info('CTP交易服务器结算信息确认成功')
         self.gateway.onSettlementInfoConfirm()
-    
+
     def onRspQryInvestorPosition(self, data, error, n, last):
         if not data['InstrumentID']:
             return
@@ -254,6 +256,13 @@ class RqCtpTdApi(CtpTdApi):
         pos.commission += data['Commission']
         pos.openCost += data['OpenCost']
 
+        size = self.symbolSizeDict.get(data['InstrumentID'], 1)
+
+        if pos.position > 0:
+            pos.avgOpenPrice = pos.openCost / (pos.position * size)
+        else:
+            pos.avgOpenPrice = 0
+
         if data['PreSettlementPrice']:
             pos.preSettlementPrice = data['PreSettlementPrice']
 
@@ -263,35 +272,36 @@ class RqCtpTdApi(CtpTdApi):
             self.posDict.clear()
 
     def onRspQryInstrument(self, data, error, n, last):
-        contract = RQContractData()
-        contract.gatewayName = self.gatewayName
+        if len(data['InstrumentID']) <= 7 and not make_underlying_symbol(data['InstrumentID']).endswith('EFP'):
+            contract = RQContractData()
+            contract.gatewayName = self.gatewayName
 
-        contract.symbol = data['InstrumentID']
-        contract.exchange = exchangeMapReverse[data['ExchangeID']]
-        contract.vtSymbol = contract.symbol  # '.'.join([contract.symbol, contract.exchange])
-        contract.name = data['InstrumentName'].decode('GBK')
+            contract.symbol = data['InstrumentID']
+            contract.exchange = exchangeMapReverse[data['ExchangeID']]
+            contract.vtSymbol = contract.symbol  # '.'.join([contract.symbol, contract.exchange])
+            contract.name = data['InstrumentName'].decode('GBK')
 
-        contract.size = data['VolumeMultiple']
-        contract.priceTick = data['PriceTick']
-        contract.strikePrice = data['StrikePrice']
-        contract.underlyingSymbol = data['UnderlyingInstrID']
+            contract.size = data['VolumeMultiple']
+            contract.priceTick = data['PriceTick']
+            contract.strikePrice = data['StrikePrice']
+            contract.underlyingSymbol = data['UnderlyingInstrID']
 
-        contract.productClass = productClassMapReverse.get(data['ProductClass'], PRODUCT_UNKNOWN)
+            contract.productClass = productClassMapReverse.get(data['ProductClass'], PRODUCT_UNKNOWN)
 
-        if data['OptionsType'] == '1':
-            contract.optionType = OPTION_CALL
-        elif data['OptionsType'] == '2':
-            contract.optionType = OPTION_PUT
+            if data['OptionsType'] == '1':
+                contract.optionType = OPTION_CALL
+            elif data['OptionsType'] == '2':
+                contract.optionType = OPTION_PUT
 
-        contract.expireDate = data['ExpireDate']
-        contract.openDate = data['OpenDate']
-        contract.longMarginRatio = data['LongMarginRatio']
-        contract.shortMarginRatio = data['ShortMarginRatio']
+            contract.expireDate = data['ExpireDate']
+            contract.openDate = data['OpenDate']
+            contract.longMarginRatio = data['LongMarginRatio']
+            contract.shortMarginRatio = data['ShortMarginRatio']
 
-        self.symbolExchangeDict[contract.symbol] = contract.exchange
-        self.symbolSizeDict[contract.symbol] = contract.size
+            self.symbolExchangeDict[contract.symbol] = contract.exchange
+            self.symbolSizeDict[contract.symbol] = contract.size
 
-        self.contract_buffer_dict[contract.symbol] = contract
+            self.contract_buffer_dict[contract.symbol] = contract
 
         if last:
             self.gateway.onContract(self.contract_buffer_dict)

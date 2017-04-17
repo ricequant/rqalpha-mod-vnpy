@@ -30,7 +30,7 @@ from rqalpha.const import ORDER_STATUS, HEDGE_TYPE, POSITION_EFFECT, SIDE, ORDER
 from .vnpy import EXCHANGE_SHFE, OFFSET_OPEN, OFFSET_CLOSE, OFFSET_CLOSETODAY, DIRECTION_SHORT, DIRECTION_LONG
 from .vnpy import STATUS_NOTTRADED, STATUS_PARTTRADED, PRICETYPE_MARKETPRICE, PRICETYPE_LIMITPRICE, CURRENCY_CNY, PRODUCT_FUTURES
 from .vnpy import VtOrderReq, VtCancelOrderReq, VtSubscribeReq, VtTradeData, VtOrderData
-
+from .util import make_underlying_symbol
 
 class DataCache(object):
     def __init__(self):
@@ -48,8 +48,6 @@ class DataCache(object):
         self.position_cache_before_init = {}
 
         self.order_cache_before_init = []
-        self.buy_open_cost_cache_before_init = 0.
-        self.sell_open_cost_cache_before_init = 0.
 
 
 class DataFactory(object):
@@ -82,10 +80,6 @@ class DataFactory(object):
         if calendar_dt.hour > 20:
             return calendar_dt + timedelta(days=1)
         return calendar_dt
-
-    @classmethod
-    def make_underlying_symbol(cls, id_or_symbol):
-        return filter(lambda x: x not in '0123456789 ', id_or_symbol).upper()
 
     # ------------------------------------ vnpy to rqalpha ------------------------------------
     @classmethod
@@ -381,7 +375,7 @@ class DataFactory(object):
         self._data_cache.order_book_id_symbol_map[order_book_id] = symbol
 
         if 'longMarginRatio' in contract.__dict__:
-            underlying_symbol = self.make_underlying_symbol(order_book_id)
+            underlying_symbol = make_underlying_symbol(order_book_id)
             if underlying_symbol not in self._data_cache.future_info_cache:
                 # hard code
                 self._data_cache.future_info_cache[underlying_symbol] = {'speculation': {}}
@@ -390,7 +384,7 @@ class DataFactory(object):
                 'margin_type': MARGIN_TYPE.BY_MONEY,
             })
         if 'shortMarginRatio' in contract.__dict__:
-            underlying_symbol = self.make_underlying_symbol(order_book_id)
+            underlying_symbol = make_underlying_symbol(order_book_id)
             if underlying_symbol not in self._data_cache.future_info_cache:
                 self._data_cache.future_info_cache[underlying_symbol] = {'speculation': {}}
             self._data_cache.future_info_cache[underlying_symbol]['speculation'].update({
@@ -398,34 +392,34 @@ class DataFactory(object):
                 'margin_type': MARGIN_TYPE.BY_MONEY,
             })
 
-    def put_commission(self, commission_data):
-        underlying_symbol = self.make_underlying_symbol(commission_data.symbol)
-        if commission_data.OpenRatioByMoney == 0 and commission_data.CloseRatioByMoney == 0:
-            open_ratio = commission_data.OpenRatioByVolume
-            close_ratio = commission_data.CloseRatioByVolume
-            close_today_ratio = commission_data.CloseTodayRatioByVolume
-            if commission_data.OpenRatioByVolume != 0 or commission_data.CloseRatioByVolume != 0:
-                commission_type = COMMISSION_TYPE.BY_VOLUME
+    def put_commission(self, commission_dict):
+        for underlying_symbol, commission_data in iteritems(commission_dict):
+            if commission_data.OpenRatioByMoney == 0 and commission_data.CloseRatioByMoney == 0:
+                open_ratio = commission_data.OpenRatioByVolume
+                close_ratio = commission_data.CloseRatioByVolume
+                close_today_ratio = commission_data.CloseTodayRatioByVolume
+                if commission_data.OpenRatioByVolume != 0 or commission_data.CloseRatioByVolume != 0:
+                    commission_type = COMMISSION_TYPE.BY_VOLUME
+                else:
+                    commission_type = None
             else:
-                commission_type = None
-        else:
-            open_ratio = commission_data.OpenRatioByMoney
-            close_ratio = commission_data.CloseRatioByMoney
-            close_today_ratio = commission_data.CloseTodayRatioByMoney
-            if commission_data.OpenRatioByVolume == 0 and commission_data.CloseRatioByVolume == 0:
-                commission_type = COMMISSION_TYPE.BY_MONEY
-            else:
-                commission_type = None
+                open_ratio = commission_data.OpenRatioByMoney
+                close_ratio = commission_data.CloseRatioByMoney
+                close_today_ratio = commission_data.CloseTodayRatioByMoney
+                if commission_data.OpenRatioByVolume == 0 and commission_data.CloseRatioByVolume == 0:
+                    commission_type = COMMISSION_TYPE.BY_MONEY
+                else:
+                    commission_type = None
 
-        if underlying_symbol not in self._data_cache.future_info_cache or \
-            'open_commission_ratio' not in self._data_cache.future_info_cache[underlying_symbol]['speculation']:
-            self._data_cache.future_info_cache[underlying_symbol] = {'speculation': {}}
-            self._data_cache.future_info_cache[underlying_symbol]['speculation'].update({
-                'open_commission_ratio': open_ratio,
-                'close_commission_ratio': close_ratio,
-                'close_commission_today_ratio': close_today_ratio,
-                'commission_type': commission_type
-            })
+            if underlying_symbol not in self._data_cache.future_info_cache or \
+                'open_commission_ratio' not in self._data_cache.future_info_cache[underlying_symbol]['speculation']:
+                self._data_cache.future_info_cache[underlying_symbol] = {'speculation': {}}
+                self._data_cache.future_info_cache[underlying_symbol]['speculation'].update({
+                    'open_commission_ratio': open_ratio,
+                    'close_commission_ratio': close_ratio,
+                    'close_commission_today_ratio': close_today_ratio,
+                    'commission_type': commission_type
+                })
 
     def put_tick_snapshot(self, tick):
         order_book_id = tick['order_book_id']
@@ -453,52 +447,22 @@ class DataFactory(object):
             self._data_cache.position_cache_before_init[order_book_id] = {}
 
         if vnpy_position.direction == DIRECTION_LONG:
-            if 'position' in vnpy_position.__dict__:
-                self._data_cache.position_cache_before_init[order_book_id]['buy_old_quantity'] = vnpy_position.ydPosition
-                self._data_cache.position_cache_before_init[order_book_id]['buy_quantity'] = vnpy_position.position
-                self._data_cache.position_cache_before_init[order_book_id][
+            self._data_cache.position_cache_before_init[order_book_id]['buy_old_quantity'] = vnpy_position.ydPosition
+            self._data_cache.position_cache_before_init[order_book_id]['buy_quantity'] = vnpy_position.position
+            self._data_cache.position_cache_before_init[order_book_id][
                     'buy_today_quantity'] = vnpy_position.position - vnpy_position.ydPosition
-            if 'commission' in vnpy_position.__dict__:
-                if 'buy_transaction_cost' not in self._data_cache.position_cache_before_init[order_book_id]:
-                    self._data_cache.position_cache_before_init[order_book_id]['buy_transaction_cost'] = 0.
-                self._data_cache.position_cache_before_init[order_book_id]['buy_transaction_cost'] += vnpy_position.commission
-            if 'closeProfit' in vnpy_position.__dict__:
-                if 'buy_realized_pnl' not in self._data_cache.position_cache_before_init[order_book_id]:
-                    self._data_cache.position_cache_before_init[order_book_id]['buy_realized_pnl'] = 0.
-                self._data_cache.position_cache_before_init[order_book_id]['buy_realized_pnl'] += vnpy_position.closeProfit
-            if 'openCost' in vnpy_position.__dict__:
-                self._data_cache.buy_open_cost_cache_before_init += vnpy_position.openCost
-                contract = self._data_cache.contract_cache.get(vnpy_position.symbol)
-                if contract is not None:
-                    contract_multiplier = contract['size']
-                    buy_quantity = self._data_cache.position_cache_before_init[order_book_id]['buy_quantity']
-                    self._data_cache.position_cache_before_init[order_book_id]['buy_avg_open_price'] =\
-                        self._data_cache.buy_open_cost_cache_before_init / (buy_quantity * contract_multiplier)\
-                        if buy_quantity != 0 else 0
+            self._data_cache.position_cache_before_init[order_book_id]['buy_transaction_cost'] = vnpy_position.commission
+            self._data_cache.position_cache_before_init[order_book_id]['buy_realized_pnl'] = vnpy_position.closeProfit
+            self._data_cache.position_cache_before_init[order_book_id]['buy_avg_open_price'] = vnpy_position.avgOpenPrice
 
         elif vnpy_position.direction == DIRECTION_SHORT:
-            if 'position' in vnpy_position.__dict__:
-                self._data_cache.position_cache_before_init[order_book_id]['sell_old_quantity'] = vnpy_position.ydPosition
-                self._data_cache.position_cache_before_init[order_book_id]['sell_quantity'] = vnpy_position.position
-                self._data_cache.position_cache_before_init[order_book_id][
+            self._data_cache.position_cache_before_init[order_book_id]['sell_old_quantity'] = vnpy_position.ydPosition
+            self._data_cache.position_cache_before_init[order_book_id]['sell_quantity'] = vnpy_position.position
+            self._data_cache.position_cache_before_init[order_book_id][
                     'sell_today_quantity'] = vnpy_position.position - vnpy_position.ydPosition
-            if 'commission' in vnpy_position.__dict__:
-                if 'sell_transaction_cost' not in self._data_cache.position_cache_before_init[order_book_id]:
-                    self._data_cache.position_cache_before_init[order_book_id]['sell_transaction_cost'] = 0.
-                self._data_cache.position_cache_before_init[order_book_id]['sell_transaction_cost'] += vnpy_position.commission
-            if 'closeProfit' in vnpy_position.__dict__:
-                if 'sell_realized_pnl' not in self._data_cache.position_cache_before_init[order_book_id]:
-                    self._data_cache.position_cache_before_init[order_book_id]['sell_realized_pnl'] = 0.
-                self._data_cache.position_cache_before_init[order_book_id]['sell_realized_pnl'] += vnpy_position.closeProfit
-            if 'openCost' in vnpy_position.__dict__:
-                self._data_cache.sell_open_cost_cache_before_init += vnpy_position.openCost
-                contract = self._data_cache.contract_cache.get(vnpy_position.symbol)
-                if contract is not None:
-                    contract_multiplier = contract['size']
-                    sell_quantity = self._data_cache.position_cache_before_init[order_book_id]['sell_quantity']
-                    self._data_cache.position_cache_before_init[order_book_id]['sell_avg_open_price'] =\
-                        self._data_cache.sell_open_cost_cache_before_init / (sell_quantity * contract_multiplier)\
-                        if sell_quantity != 0 else 0
+            self._data_cache.position_cache_before_init[order_book_id]['sell_transaction_cost'] = vnpy_position.commission
+            self._data_cache.position_cache_before_init[order_book_id]['sell_realized_pnl'] = vnpy_position.closeProfit
+            self._data_cache.position_cache_before_init[order_book_id]['sell_avg_open_price'] = vnpy_position.avgOpenPrice
 
         if 'preSettlementPrice' in vnpy_position.__dict__:
             self._data_cache.position_cache_before_init[order_book_id]['prev_settle_price'] = vnpy_position.preSettlementPrice
@@ -527,7 +491,7 @@ class DataFactory(object):
         return self._data_cache.order_book_id_symbol_map.get(order_book_id)
 
     def get_future_info(self, order_book_id, hedge_flag='speculation'):
-        underlying_symbol = self.make_underlying_symbol(order_book_id)
+        underlying_symbol = make_underlying_symbol(order_book_id)
         if underlying_symbol not in self._data_cache.future_info_cache:
             return None
         if hedge_flag not in self._data_cache.future_info_cache[underlying_symbol]:

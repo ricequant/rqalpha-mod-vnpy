@@ -141,9 +141,9 @@ class RQVNPYEngine(object):
             self._data_factory.cache_contract(contract)
 
     def on_commission(self, event):
-        commission_data = event.dict_['data']
-        system_log.debug('on_commission {}', commission_data.__dict__)
-        self._data_factory.put_commission(commission_data)
+        commission_dict = event.dict_['data']
+        system_log.debug('on_commission {}', len(commission_dict))
+        self._data_factory.put_commission(commission_dict)
 
     # ------------------------------------ tick生命周期 ------------------------------------
     def on_universe_changed(self, event):

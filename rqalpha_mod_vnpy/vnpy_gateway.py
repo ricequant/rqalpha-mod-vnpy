@@ -41,6 +41,7 @@ class RQPositionData(VtPositionData):
         self.closeProfit = EMPTY_FLOAT
         self.openCost = EMPTY_FLOAT
         self.preSettlementPrice = EMPTY_FLOAT
+        self.avgOpenPrice = EMPTY_FLOAT
 
 
 class RQContractData(VtContractData):
