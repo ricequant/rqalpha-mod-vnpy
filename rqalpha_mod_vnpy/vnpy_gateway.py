@@ -37,7 +37,7 @@ class RQPositionData(VtPositionData):
     def __init__(self):
         super(RQPositionData, self).__init__()
 
-        self.TodsyPosition = EMPTY_FLOAT
+        self.todayPosition = EMPTY_FLOAT
         self.commission = EMPTY_FLOAT
         self.closeProfit = EMPTY_FLOAT
         self.openCost = EMPTY_FLOAT
