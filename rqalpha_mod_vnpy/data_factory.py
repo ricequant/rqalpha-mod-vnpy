@@ -32,6 +32,7 @@ from .vnpy import STATUS_NOTTRADED, STATUS_PARTTRADED, PRICETYPE_MARKETPRICE, PR
 from .vnpy import VtOrderReq, VtCancelOrderReq, VtSubscribeReq, VtTradeData, VtOrderData
 from .util import make_underlying_symbol
 
+
 class DataCache(object):
     def __init__(self):
         self.order_dict = {}

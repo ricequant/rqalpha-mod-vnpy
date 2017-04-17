@@ -51,6 +51,8 @@ class RQVNPYEngine(object):
         self._data_factory = data_factory
 
         self._tick_que = Queue()
+        self.strategy_subscribed = set()
+        self.subscribed = set()
 
         self._register_event()
         self._account_inited = False
@@ -152,17 +154,26 @@ class RQVNPYEngine(object):
             self.subscribe(order_book_id)
 
     def subscribe(self, order_book_id):
-        subscribe_req = self._data_factory.make_subscribe_req(order_book_id)
-        if subscribe_req is None:
-            system_log.error('Cannot find contract whose order_book_id is %s' % order_book_id)
-            return
-        self.vnpy_gateway.subscribe(subscribeReq=subscribe_req)
+        if order_book_id not in self.strategy_subscribed:
+            self.strategy_subscribed.add(order_book_id)
+            self._subscribe(order_book_id)
+
+    def _subscribe(self, order_book_id):
+        if order_book_id not in self.subscribed:
+            self.subscribed.add(order_book_id)
+            subscribe_req = self._data_factory.make_subscribe_req(order_book_id)
+            if subscribe_req is None:
+                system_log.error('Cannot find con tract whose order_book_id is %s' % order_book_id)
+                return
+            self.vnpy_gateway.subscribe(subscribeReq=subscribe_req)
 
     def on_tick(self, event):
         vnpy_tick = event.dict_['data']
-        system_log.debug("on_tick {}", vnpy_tick.__dict__)
+
         tick = self._data_factory.make_tick(vnpy_tick)
-        self._tick_que.put(tick)
+        if tick['order_book_id'] in self.strategy_subscribed:
+            system_log.debug("on_tick {}", vnpy_tick.__dict__)
+            self._tick_que.put(tick)
         self._data_factory.put_tick_snapshot(tick)
 
     def get_tick(self):
@@ -211,6 +222,10 @@ class RQVNPYEngine(object):
         self.vnpy_gateway.qryPosition()
 
         self.vnpy_gateway.qryCommission(self._data_factory.get_contract_cache().keys())
+        
+        for symbol in self._data_factory.get_contract_cache().keys():
+            order_book_id = self._data_factory.make_order_book_id(symbol)
+            self._subscribe(order_book_id)
 
     @property
     def account_inited(self):
