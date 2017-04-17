@@ -24,8 +24,8 @@ from rqalpha.const import ACCOUNT_TYPE, ORDER_STATUS
 from rqalpha.model.portfolio import Portfolio
 from rqalpha.environment import Environment
 
-from .vnpy import EVENT_CONTRACT, EVENT_ORDER, EVENT_TRADE, EVENT_TICK, EVENT_LOG, EVENT_ACCOUNT, EVENT_POSITION, EVENT_ERROR
-from .vnpy import STATUS_NOTTRADED, STATUS_PARTTRADED, STATUS_ALLTRADED, STATUS_CANCELLED, STATUS_UNKNOWN
+from .vnpy import *
+from .utils import make_order_book_id, make_trade, make_tick
 
 from .vnpy_gateway import EVENT_COMMISSION
 from .ctp_gateway import RQCtpGateway
@@ -52,7 +52,6 @@ class RQVNPYEngine(object):
 
         self._tick_que = Queue()
         self.strategy_subscribed = set()
-        self.subscribed = set()
 
         self._register_event()
         self._account_inited = False
@@ -131,7 +130,7 @@ class RQVNPYEngine(object):
             self._data_factory.cache_vnpy_trade_before_init(vnpy_trade)
         else:
             order = self._data_factory.get_order(vnpy_trade)
-            trade = self._data_factory.make_trade(vnpy_trade, order.order_id)
+            trade = make_trade(vnpy_trade, order.order_id)
             account = Environment.get_instance().get_account(order.order_book_id)
             self._env.event_bus.publish_event(Event(EVENT.TRADE, account=account, trade=trade))
 
@@ -159,18 +158,16 @@ class RQVNPYEngine(object):
             self._subscribe(order_book_id)
 
     def _subscribe(self, order_book_id):
-        if order_book_id not in self.subscribed:
-            self.subscribed.add(order_book_id)
-            subscribe_req = self._data_factory.make_subscribe_req(order_book_id)
-            if subscribe_req is None:
-                system_log.error('Cannot find con tract whose order_book_id is %s' % order_book_id)
-                return
-            self.vnpy_gateway.subscribe(subscribeReq=subscribe_req)
+        subscribe_req = self._data_factory.make_subscribe_req(order_book_id)
+        if subscribe_req is None:
+            system_log.error('Cannot find con tract whose order_book_id is %s' % order_book_id)
+            return
+        self.vnpy_gateway.subscribe(subscribeReq=subscribe_req)
 
     def on_tick(self, event):
         vnpy_tick = event.dict_['data']
 
-        tick = self._data_factory.make_tick(vnpy_tick)
+        tick = make_tick(vnpy_tick)
         if tick['order_book_id'] in self.strategy_subscribed:
             system_log.debug("on_tick {}", vnpy_tick.__dict__)
             self._tick_que.put(tick)
@@ -224,7 +221,7 @@ class RQVNPYEngine(object):
         self.vnpy_gateway.qryCommission(self._data_factory.get_contract_cache().keys())
         
         for symbol in self._data_factory.get_contract_cache().keys():
-            order_book_id = self._data_factory.make_order_book_id(symbol)
+            order_book_id = make_order_book_id(symbol)
             self._subscribe(order_book_id)
 
     @property
@@ -240,15 +237,8 @@ class RQVNPYEngine(object):
         self.event_engine.register(EVENT_CONTRACT, self.on_contract)
         self.event_engine.register(EVENT_TRADE, self.on_trade)
         self.event_engine.register(EVENT_TICK, self.on_tick)
-        self.event_engine.register(EVENT_LOG, self.on_log)
         self.event_engine.register(EVENT_ACCOUNT, self.on_account)
         self.event_engine.register(EVENT_POSITION, self.on_positions)
         self.event_engine.register(EVENT_COMMISSION, self.on_commission)
-        self.event_engine.register(EVENT_ERROR, lambda e: system_log.error(e.dict_['data']))
 
         self._env.event_bus.add_listener(EVENT.POST_UNIVERSE_CHANGED, self.on_universe_changed)
-
-    # ------------------------------------ 其他 ------------------------------------
-    def on_log(self, event):
-        log = event.dict_['data']
-        system_log.info(log.logContent)

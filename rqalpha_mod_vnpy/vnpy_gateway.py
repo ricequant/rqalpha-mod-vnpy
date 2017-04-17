@@ -16,9 +16,7 @@
 # limitations under the License.
 
 from Queue import Empty
-from .vnpy import VtBaseData, VtPositionData, VtContractData
-from .vnpy import EMPTY_FLOAT, EMPTY_STRING
-from .vnpy import EventEngine2
+from .vnpy import *
 
 EVENT_POSITION_EXTRA = 'ePositionExtra'
 EVENT_CONTRACT_EXTRA = 'eContractExtra'

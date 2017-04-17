@@ -23,28 +23,31 @@ from vtConstant import *
 from eventEngine import EventEngine2, Event
 from vtGateway import VtOrderReq, VtCancelOrderReq, VtSubscribeReq, VtBaseData, VtTradeData, VtOrderData, VtPositionData, VtContractData
 from eventType import EVENT_CONTRACT, EVENT_ORDER, EVENT_TRADE, EVENT_TICK, EVENT_LOG, EVENT_ACCOUNT, EVENT_POSITION, EVENT_ERROR
-from gateway.ctpGateway.ctpGateway import CtpGateway, CtpMdApi, CtpTdApi, posiDirectionMapReverse, EXCHANGE_SHFE, EXCHANGE_UNKNOWN, exchangeMapReverse, productClassMapReverse, OPTION_CALL, OPTION_PUT, PRODUCT_UNKNOWN
+from gateway.ctpGateway.ctpGateway import CtpGateway, CtpMdApi, CtpTdApi, posiDirectionMapReverse, exchangeMapReverse, productClassMapReverse
 
 __all__ = [
-    'EXCHANGE_SHFE',
-    'OFFSET_OPEN',
-    'OFFSET_CLOSE',
-    'OFFSET_CLOSETODAY',
     'DIRECTION_LONG',
     'DIRECTION_SHORT',
-    'PRICETYPE_LIMITPRICE',
     'PRICETYPE_MARKETPRICE',
-    'STATUS_NOTTRADED',
-    'STATUS_PARTTRADED',
-    'STATUS_ALLTRADED',
-    'STATUS_CANCELLED',
+    'PRICETYPE_LIMITPRICE',
+    'OFFSET_OPEN',
+    'OFFSET_CLOSE',
     'STATUS_UNKNOWN',
-    'CURRENCY_CNY',
-    'PRODUCT_FUTURES',
-    'EMPTY_FLOAT',
+    'STATUS_PARTTRADED',
+    'STATUS_NOTTRADED',
     'EMPTY_STRING',
+    'EMPTY_FLOAT',
+    'PRODUCT_FUTURES',
+    'PRODUCT_UNKNOWN',
+    'CURRENCY_CNY',
+    'EXCHANGE_SHFE',
+    'EXCHANGE_UNKNOWN',
+    'OPTION_CALL',
+    'OPTION_PUT',
+
     'EventEngine2',
     'Event',
+
     'VtCancelOrderReq',
     'VtOrderReq',
     'VtBaseData',
@@ -52,16 +55,15 @@ __all__ = [
     'VtTradeData',
     'VtPositionData',
     'VtSubscribeReq',
+
     'EVENT_POSITION',
     'EVENT_ACCOUNT',
     'EVENT_CONTRACT',
-    'EVENT_LOG',
     'EVENT_ORDER',
     'EVENT_TICK',
     'EVENT_TRADE',
-    'EVENT_ERROR',
-    'EXCHANGE_SHFE',
-    'EXCHANGE_UNKNOWN',
+    
+
     'CtpGateway',
     'CtpMdApi',
     'CtpTdApi',
@@ -69,7 +71,5 @@ __all__ = [
     'exchangeMapReverse',
     'VtContractData',
     'productClassMapReverse',
-    'OPTION_CALL',
-    'OPTION_PUT',
-    'PRODUCT_UNKNOWN',
+
 ]

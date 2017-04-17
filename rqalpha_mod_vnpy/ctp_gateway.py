@@ -15,12 +15,11 @@
 # limitations under the License.
 
 from time import sleep
-from tqdm import tqdm
 from rqalpha.utils.logger import system_log
 
 from .vnpy import *
 from .vnpy_gateway import RQPositionData, RQContractData, RQCommissionData, EVENT_COMMISSION
-from .util import make_underlying_symbol
+from .utils import make_underlying_symbol
 
 
 class RQCtpGateway(CtpGateway):
