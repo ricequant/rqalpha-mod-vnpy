@@ -22,7 +22,7 @@ sys.path.append(vn_trader_path)
 from vtConstant import *
 from eventEngine import EventEngine2, Event
 from vtGateway import VtOrderReq, VtCancelOrderReq, VtSubscribeReq, VtBaseData, VtTradeData, VtOrderData, VtPositionData, VtContractData
-from eventType import EVENT_CONTRACT, EVENT_ORDER, EVENT_TRADE, EVENT_TICK, EVENT_LOG, EVENT_ACCOUNT, EVENT_POSITION, EVENT_ERROR
+from eventType import EVENT_CONTRACT, EVENT_ORDER, EVENT_TRADE, EVENT_TICK, EVENT_ACCOUNT, EVENT_POSITION
 from gateway.ctpGateway.ctpGateway import CtpGateway, CtpMdApi, CtpTdApi, posiDirectionMapReverse, exchangeMapReverse, productClassMapReverse
 
 __all__ = [
@@ -54,6 +54,7 @@ __all__ = [
     'VtOrderData',
     'VtTradeData',
     'VtPositionData',
+    'VtContractData',
     'VtSubscribeReq',
 
     'EVENT_POSITION',
@@ -69,7 +70,5 @@ __all__ = [
     'CtpTdApi',
     'posiDirectionMapReverse',
     'exchangeMapReverse',
-    'VtContractData',
     'productClassMapReverse',
-
 ]

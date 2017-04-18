@@ -155,7 +155,6 @@ class RQVNPYEngine(object):
     def subscribe(self, order_book_id):
         if order_book_id not in self.strategy_subscribed:
             self.strategy_subscribed.add(order_book_id)
-            self._subscribe(order_book_id)
 
     def _subscribe(self, order_book_id):
         subscribe_req = self._data_factory.make_subscribe_req(order_book_id)
