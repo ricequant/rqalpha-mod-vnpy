@@ -18,7 +18,8 @@
 from Queue import Queue, Empty
 from six import iteritems
 
-from rqalpha.events import EVENT, Event
+from rqalpha.events import EVENT
+from rqalpha.events import Event as RqEvent
 from rqalpha.utils.logger import system_log
 from rqalpha.const import ACCOUNT_TYPE, ORDER_STATUS
 from rqalpha.model.portfolio import Portfolio
@@ -59,14 +60,14 @@ class RQVNPYEngine(object):
     # ------------------------------------ order生命周期 ------------------------------------
     def send_order(self, order):
         account = Environment.get_instance().get_account(order.order_book_id)
-        self._env.event_bus.publish_event(Event(EVENT.ORDER_PENDING_NEW, account=account, order=order))
+        self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_PENDING_NEW, account=account, order=order))
 
         order_req = self._data_factory.make_order_req(order)
 
         if order_req is None:
-            self._env.event_bus.publish_event(Event(EVENT.ORDER_PENDING_CANCEL))
+            self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_PENDING_CANCEL))
             order.mark_cancelled('No contract exists whose order_book_id is %s' % order.order_book_id)
-            self._env.event_bus.publish_event(Event(EVENT.ORDER_CANCELLATION_PASS))
+            self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_CANCELLATION_PASS))
 
         if order.is_final():
             return
@@ -76,7 +77,7 @@ class RQVNPYEngine(object):
 
     def cancel_order(self, order):
         account = Environment.get_instance().get_account(order.order_book_id)
-        self._env.event_bus.publish_event(Event(EVENT.ORDER_PENDING_CANCEL, account=account, order=order))
+        self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_PENDING_CANCEL, account=account, order=order))
 
         cancel_order_req = self._data_factory.make_cancel_order_req(order)
         if cancel_order_req is None:
@@ -101,7 +102,7 @@ class RQVNPYEngine(object):
 
             order.active()
 
-            self._env.event_bus.publish_event(Event(EVENT.ORDER_CREATION_PASS, account=account, order=order))
+            self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_CREATION_PASS, account=account, order=order))
 
             self._data_factory.cache_vnpy_order(order.order_id, vnpy_order)
 
@@ -113,10 +114,10 @@ class RQVNPYEngine(object):
                 self._data_factory.del_open_order(vnpy_order_id)
                 if order.status == ORDER_STATUS.PENDING_CANCEL:
                     order.mark_cancelled("%d order has been cancelled by user." % order.order_id)
-                    self._env.event_bus.publish_event(Event(EVENT.ORDER_CANCELLATION_PASS, account=account, order=order))
+                    self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_CANCELLATION_PASS, account=account, order=order))
                 else:
                     order.mark_rejected('Order was rejected or cancelled by vnpy.')
-                    self._env.event_bus.publish_event(Event(EVENT.ORDER_UNSOLICITED_UPDATE, account=account, order=order))
+                    self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_UNSOLICITED_UPDATE, account=account, order=order))
 
     def get_open_orders(self, order_book_id):
         return self._data_factory.get_open_orders(order_book_id)
@@ -132,7 +133,7 @@ class RQVNPYEngine(object):
             order = self._data_factory.get_order(vnpy_trade)
             trade = make_trade(vnpy_trade, order.order_id)
             account = Environment.get_instance().get_account(order.order_book_id)
-            self._env.event_bus.publish_event(Event(EVENT.TRADE, account=account, trade=trade))
+            self._env.event_bus.publish_event(RqEvent(EVENT.TRADE, account=account, trade=trade))
 
     # ------------------------------------ instrument生命周期 ------------------------------------
     def on_contract(self, event):
