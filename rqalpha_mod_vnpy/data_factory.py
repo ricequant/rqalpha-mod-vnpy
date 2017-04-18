@@ -262,7 +262,7 @@ class DataFactory(object):
             self._data_cache.position_cache_before_init[order_book_id] = {}
         if 'trades' not in self._data_cache.position_cache_before_init[order_book_id]:
             self._data_cache.position_cache_before_init[order_book_id]['trades'] = []
-            self._data_cache.position_cache_before_init[order_book_id]['trades'].append(vnpy_trade)
+        self._data_cache.position_cache_before_init[order_book_id]['trades'].append(vnpy_trade)
 
     def cache_vnpy_account_before_init(self, vnpy_account):
         if 'preBalance' in vnpy_account.__dict__:
