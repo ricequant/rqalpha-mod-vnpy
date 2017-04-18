@@ -168,6 +168,36 @@ class RqCtpMdApi(CtpMdApi):
         else:
             system_log.error('CTP行情服务器登出错误，错误代码：%s，错误信息：%s' % (str(error['ErrorID']), error['ErrorMsg'].decode('gbk')))
 
+    def onRtnDepthMarketData(self, data):
+
+        tick = VtTickData()
+        tick.gatewayName = self.gatewayName
+
+        tick.symbol = data['InstrumentID']
+        tick.exchange = exchangeMapReverse.get(data['ExchangeID'], u'未知')
+        tick.vtSymbol = tick.symbol
+
+        tick.lastPrice = data['LastPrice']
+        tick.volume = data['Volume']
+        tick.openInterest = data['OpenInterest']
+        tick.time = '.'.join([data['UpdateTime'], str(data['UpdateMillisec'] / 100)])
+
+        tick.date = datetime.now().strftime('%Y%m%d')
+
+        tick.openPrice = data['OpenPrice']
+        tick.highPrice = data['HighestPrice']
+        tick.lowPrice = data['LowestPrice']
+        tick.preClosePrice = data['PreClosePrice']
+
+        tick.upperLimit = data['UpperLimitPrice']
+        tick.lowerLimit = data['LowerLimitPrice']
+
+        tick.bidPrice1 = data['BidPrice1']
+        tick.bidVolume1 = data['BidVolume1']
+        tick.askPrice1 = data['AskPrice1']
+        tick.askVolume1 = data['AskVolume1']
+
+        self.gateway.onTick(tick)
 
 class RqCtpTdApi(CtpTdApi):
 
@@ -319,37 +349,6 @@ class RqCtpTdApi(CtpTdApi):
         commissionData.CloseTodayRatioByVolume = data['CloseTodayRatioByVolume']
 
         self.gateway.onCommission(commissionData)
-
-    def onRtnDepthMarketData(self, data):
-
-        tick = VtTickData()
-        tick.gatewayName = self.gatewayName
-
-        tick.symbol = data['InstrumentID']
-        tick.exchange = exchangeMapReverse.get(data['ExchangeID'], u'未知')
-        tick.vtSymbol = tick.symbol
-
-        tick.lastPrice = data['LastPrice']
-        tick.volume = data['Volume']
-        tick.openInterest = data['OpenInterest']
-        tick.time = '.'.join([data['UpdateTime'], str(data['UpdateMillisec'] / 100)])
-
-        tick.date = datetime.now().strftime('%Y%m%d')
-
-        tick.openPrice = data['OpenPrice']
-        tick.highPrice = data['HighestPrice']
-        tick.lowPrice = data['LowestPrice']
-        tick.preClosePrice = data['PreClosePrice']
-
-        tick.upperLimit = data['UpperLimitPrice']
-        tick.lowerLimit = data['LowerLimitPrice']
-
-        tick.bidPrice1 = data['BidPrice1']
-        tick.bidVolume1 = data['BidVolume1']
-        tick.askPrice1 = data['AskPrice1']
-        tick.askVolume1 = data['AskVolume1']
-
-        self.gateway.onTick(tick)
 
     def onRspError(self, error, n, last):
         system_log.error('CTP交易服务器错误，错误代码：%s，错误信息：%s' % (str(error['ErrorID']), error['ErrorMsg'].decode('gbk')))
