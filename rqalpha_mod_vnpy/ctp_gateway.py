@@ -25,7 +25,7 @@ from .utils import make_underlying_symbol
 
 class RQCtpGateway(CtpGateway):
 
-    def __init__(self, event_engine, gateway_name, login_dict, retry_times=3, retry_interval=1):
+    def __init__(self, event_engine, gateway_name, login_dict, retry_times=5, retry_interval=1):
         super(CtpGateway, self).__init__(event_engine, gateway_name)
 
         self.login_dict = login_dict
@@ -80,32 +80,42 @@ class RQCtpGateway(CtpGateway):
         mdAddress = str(self.login_dict.mdAddress)
 
         for i in range(self._retry_times):
+            self.mdApi.connect(userID, password, brokerID, mdAddress)
+            sleep(self._retry_interval * (i + 1))
             if self.mdApi.loginStatus:
                 break
-            self.mdApi.connect(userID, password, brokerID, mdAddress)
-            sleep(self._retry_interval * (i+1))
+        else:
+            raise RuntimeError('CTP 行情服务器连接或登录超时')
         
         for i in range(self._retry_times):
+            self.tdApi.connect(userID, password, brokerID, tdAddress, None, None)
+            sleep(self._retry_interval * (i + 1))
             if self.tdApi.loginStatus:
                 break
-            self.tdApi.connect(userID, password, brokerID, tdAddress, None, None)
-            sleep(self._retry_interval * (i+1))
+        else:
+            raise RuntimeError('CTP 交易服务器连接或登录超时')
+
         self.initQuery()
 
     def qrySettlementInfoConfirm(self):
         self._settlement_info_confirmed = False
         for i in range(self._retry_times):
-            if not self._settlement_info_confirmed:
-                self.tdApi.qrySettlementInfoConfirm()
-                sleep(self._retry_interval * (i+1))
+            self.tdApi.qrySettlementInfoConfirm()
+            sleep(self._retry_interval * (i + 1))
+            if self._settlement_info_confirmed:
+                break
+        else:
+            raise RuntimeError('确认结算信息超时')
 
     def qryAccount(self):
         self._account_received = False
         for i in range(self._retry_times):
+            super(RQCtpGateway, self).qryAccount()
+            sleep(self._retry_interval * (i + 1))
             if self._account_received:
                 break
-            super(RQCtpGateway, self).qryAccount()
-            sleep(self._retry_interval * (i+1))
+        else:
+            raise RuntimeError('同步账户信息超时')
 
     def qryPosition(self):
         self._position_received = False
@@ -118,10 +128,12 @@ class RQCtpGateway(CtpGateway):
     def qryContract(self):
         self._contract_received = False
         for i in range(self._retry_times):
+            self.tdApi.qryInstrument()
+            sleep(self._retry_interval * (i + 1))
             if self._contract_received:
                 break
-            self.tdApi.qryInstrument()
-            sleep(self._retry_interval * (i+1))
+        else:
+            raise RuntimeError('请求合约数据超时')
 
     def qryCommission(self, symbol_list):
         self._commission_buffer = {}
@@ -170,7 +182,6 @@ class RqCtpMdApi(CtpMdApi):
             system_log.error('CTP行情服务器登出错误，错误代码：%s，错误信息：%s' % (str(error['ErrorID']), error['ErrorMsg'].decode('gbk')))
 
     def onRtnDepthMarketData(self, data):
-
         tick = VtTickData()
         tick.gatewayName = self.gatewayName
 
@@ -199,6 +210,7 @@ class RqCtpMdApi(CtpMdApi):
         tick.askVolume1 = data['AskVolume1']
 
         self.gateway.onTick(tick)
+
 
 class RqCtpTdApi(CtpTdApi):
 
