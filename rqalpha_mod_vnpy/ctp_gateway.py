@@ -47,6 +47,7 @@ class RQCtpGateway(CtpGateway):
         self._account_received = False
         self._position_received = False
         self._contract_received = False
+        self._order_received = False
 
     def onSettlementInfoConfirm(self):
         self._settlement_info_confirmed = True
@@ -73,9 +74,11 @@ class RQCtpGateway(CtpGateway):
         self._commission_buffer[underlying_symbol] = commission
 
     def onQryOrder(self, order):
-        event1 = Event(type_=EVENT_ORDER)
-        event1.dict_['data'] = order
-        self.eventEngine.put(event1)
+        if not self._order_received:
+            event1 = Event(type_=EVENT_ORDER)
+            event1.dict_['data'] = order
+            self.eventEngine.put(event1)
+        self._order_received = True
 
     def onOrder(self, order):
         pass
@@ -158,8 +161,14 @@ class RQCtpGateway(CtpGateway):
         self.eventEngine.put(event)
 
     def qryOrder(self):
-        sleep(3)
-        self.tdApi.qryOrder()
+        self._order_received = False
+        for i in range(self._retry_times):
+            self.tdApi.qryOrder()
+            sleep(self._retry_interval * (i+1))
+            if self._order_received:
+                break
+        else:
+            raise RuntimeError('同步订单信息超时')
 
 
 class RqCtpMdApi(CtpMdApi):
@@ -418,7 +427,7 @@ class RqCtpTdApi(CtpTdApi):
 
         # 推送
         self.gateway.onQryOrder(order)
-        
+
     def qrySettlementInfoConfirm(self):
         # 登录成功后应确认结算信息
         req = {}
