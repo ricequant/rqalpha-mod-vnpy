@@ -72,6 +72,14 @@ class RQCtpGateway(CtpGateway):
         underlying_symbol = make_underlying_symbol(commission.symbol)
         self._commission_buffer[underlying_symbol] = commission
 
+    def onQryOrder(self, order):
+        event1 = Event(type_=EVENT_ORDER)
+        event1.dict_['data'] = order
+        self.eventEngine.put(event1)
+
+    def onOrder(self, order):
+        pass
+
     def connect(self):
         userID = str(self.login_dict.userID)
         password = str(self.login_dict.password)
@@ -148,6 +156,10 @@ class RQCtpGateway(CtpGateway):
         event = Event(type_=EVENT_COMMISSION)
         event.dict_['data'] = self._commission_buffer
         self.eventEngine.put(event)
+
+    def qryOrder(self):
+        sleep(3)
+        self.tdApi.qryOrder()
 
 
 class RqCtpMdApi(CtpMdApi):
@@ -372,6 +384,41 @@ class RqCtpTdApi(CtpTdApi):
     def onErrRtnOrderAction(self, data, error):
         system_log.error('CTP交易服务器撤单错误，错误代码：%s，错误信息：%s' % (str(error['ErrorID']), error['ErrorMsg'].decode('gbk')))
 
+    def onRspQryOrder(self, data, error, n, last):
+        newref = data['OrderRef']
+        self.orderRef = max(self.orderRef, int(newref))
+
+        order = VtOrderData()
+        order.gatewayName = self.gatewayName
+
+        # 保存代码和报单号
+        order.symbol = data['InstrumentID']
+        order.exchange = exchangeMapReverse[data['ExchangeID']]
+        order.vtSymbol = order.symbol  # '.'.join([order.symbol, order.exchange])
+
+        order.orderID = data['OrderRef']
+        # CTP的报单号一致性维护需要基于frontID, sessionID, orderID三个字段
+        # 但在本接口设计中，已经考虑了CTP的OrderRef的自增性，避免重复
+        # 唯一可能出现OrderRef重复的情况是多处登录并在非常接近的时间内（几乎同时发单）
+        # 考虑到VtTrader的应用场景，认为以上情况不会构成问题
+        order.vtOrderID = '.'.join([self.gatewayName, order.orderID])
+
+        order.direction = directionMapReverse.get(data['Direction'], DIRECTION_UNKNOWN)
+        order.offset = offsetMapReverse.get(data['CombOffsetFlag'], OFFSET_UNKNOWN)
+        order.status = statusMapReverse.get(data['OrderStatus'], STATUS_UNKNOWN)
+
+        # 价格、报单量等数值
+        order.price = data['LimitPrice']
+        order.totalVolume = data['VolumeTotalOriginal']
+        order.tradedVolume = data['VolumeTraded']
+        order.orderTime = data['InsertTime']
+        order.cancelTime = data['CancelTime']
+        order.frontID = data['FrontID']
+        order.sessionID = data['SessionID']
+
+        # 推送
+        self.gateway.onQryOrder(order)
+        
     def qrySettlementInfoConfirm(self):
         # 登录成功后应确认结算信息
         req = {}
@@ -393,3 +440,11 @@ class RqCtpTdApi(CtpTdApi):
             'ExchangeID': self.symbolExchangeDict.get(instrumentId, EXCHANGE_UNKNOWN)
         }
         self.reqQryInstrumentCommissionRate(req, self.reqID)
+
+    def qryOrder(self):
+        req = {
+            'BrokerID': self.brokerID,
+            'InvestorID': self.userID,
+        }
+        self.reqID += 1
+        self.reqQryOrder(req, self.reqID)
