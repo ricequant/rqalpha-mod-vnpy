@@ -395,7 +395,10 @@ class RqCtpTdApi(CtpTdApi):
 
     def onRspQryOrder(self, data, error, n, last):
         newref = data['OrderRef']
-        self.orderRef = max(self.orderRef, int(newref))
+        try:
+            self.orderRef = max(self.orderRef, int(newref))
+        except ValueError:
+            pass
 
         order = VtOrderData()
         order.gatewayName = self.gatewayName
