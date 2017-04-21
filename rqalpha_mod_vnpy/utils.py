@@ -163,37 +163,37 @@ def make_tick(vnpy_tick):
         'open_interest': vnpy_tick.openInterest,
         'prev_settlement': np.nan,
 
-        'bid': [
-            vnpy_tick.bidPrice1,
-            vnpy_tick.bidPrice2,
-            vnpy_tick.bidPrice3,
-            vnpy_tick.bidPrice4,
-            vnpy_tick.bidPrice5,
-        ],
-        'bid_volume': [
-            vnpy_tick.bidVolume1,
-            vnpy_tick.bidVolume2,
-            vnpy_tick.bidVolume3,
-            vnpy_tick.bidVolume4,
-            vnpy_tick.bidVolume5,
-        ],
-        'ask': [
-            vnpy_tick.askPrice1,
-            vnpy_tick.askPrice2,
-            vnpy_tick.askPrice3,
-            vnpy_tick.askPrice4,
-            vnpy_tick.askPrice5,
-        ],
-        'ask_volume': [
-            vnpy_tick.askVolume1,
-            vnpy_tick.askVolume2,
-            vnpy_tick.askVolume3,
-            vnpy_tick.askVolume4,
-            vnpy_tick.askVolume5,
-        ],
+        'b1': vnpy_tick.bidPrice1,
+        'b2': vnpy_tick.bidPrice2,
+        'b3': vnpy_tick.bidPrice3,
+        'b4': vnpy_tick.bidPrice4,
+        'b5': vnpy_tick.bidPrice5,
+
+        'b1_v': vnpy_tick.bidVolume1,
+        'b2_v': vnpy_tick.bidVolume2,
+        'b3_v': vnpy_tick.bidVolume3,
+        'b4_v': vnpy_tick.bidVolume4,
+        'b5_v': vnpy_tick.bidVolume5,
+
+
+        'a1': vnpy_tick.askPrice1,
+        'a2': vnpy_tick.askPrice2,
+        'a3': vnpy_tick.askPrice3,
+        'a4': vnpy_tick.askPrice4,
+        'a5': vnpy_tick.askPrice5,
+
+        'a1_v': vnpy_tick.askVolume1,
+        'a2_v': vnpy_tick.askVolume2,
+        'a3_v': vnpy_tick.askVolume3,
+        'a4_v': vnpy_tick.askVolume4,
+        'a5_v': vnpy_tick.askVolume5,
+
 
         'limit_up': vnpy_tick.upperLimit,
         'limit_down': vnpy_tick.lowerLimit,
     }
+
     return tick
+
+
 
