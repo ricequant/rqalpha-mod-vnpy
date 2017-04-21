@@ -63,13 +63,13 @@ class CtpMdApi(MdApi):
     def onFrontConnected(self):
         """服务器连接"""
         self.connected = True
-        self.gateway.on_connected(CallBackData(self.api_name))
+        self.login()
 
     def onFrontDisconnected(self, n):
         """服务器断开"""
         self.connected = False
         self.logged_in = False
-        self.gateway.on_disconnected(CallBackData(self.api_name, n))
+        self.gateway.md_logged_in = False
 
     def onHeartBeatWarning(self, n):
         """心跳报警"""
@@ -83,7 +83,7 @@ class CtpMdApi(MdApi):
         """登陆回报"""
         if error['ErrorID'] == 0:
             self.logged_in = True
-            self.gateway.on_login(CallBackData(self.api_name, n))
+            self.gateway.md_logged_in = True
         else:
             self.gateway.on_err(CallBackData(self.api_name, n, error))
 
@@ -91,7 +91,7 @@ class CtpMdApi(MdApi):
         """登出回报"""
         if error['ErrorID'] == 0:
             self.logged_in = False
-            self.gateway.on_logout(CallBackData(self.api_name, n))
+            self.gateway.md_logged_in = False
         else:
             self.gateway.on_err(CallBackData(self.api_name, n, error))
 
@@ -106,7 +106,7 @@ class CtpMdApi(MdApi):
     def onRtnDepthMarketData(self, data):
         """行情推送"""
         tick_dict = TickDict(data)
-        self.gateway.on_tick(CallBackData(self.api_name, data=tick_dict))
+        self.gateway.on_tick(tick_dict)
 
     def onRspSubForQuoteRsp(self, data, error, n, last):
         """订阅期权询价"""
@@ -128,24 +128,28 @@ class CtpMdApi(MdApi):
             self.createFtdcMdApi(self.temp_path)
             self.registerFront(self.address)
             self.init()
+        else:
+            self.login()
 
     def subscribe(self, order_book_id):
         """订阅合约"""
-        try:
-            instrument_id = self.gateway.get_instrument_id(order_book_id)
+        instrument_id = self.gateway.get_instrument_id(order_book_id)
+        if instrument_id:
             self.subscribeMarketData(str(instrument_id))
-        except KeyError:
-            self.gateway.on_err('order_book_id 为 %s 的合约不存在' % order_book_id)
 
     def login(self):
         """登录"""
-        req = {
-            'UserID': self.user_id,
-            'Password': self.password,
-            'BrokerID': self.broker_id,
-        }
-        self.req_id += 1
-        self.reqUserLogin(req, self.reqID)
+        if not self.logged_in:
+            req = {
+                'UserID': self.user_id,
+                'Password': self.password,
+                'BrokerID': self.broker_id,
+            }
+            self.req_id += 1
+            self.reqUserLogin(req, self.req_id)
+        else:
+            self.gateway.md_logged_in = True
+        return self.req_id
 
     def close(self):
         """关闭"""
@@ -185,13 +189,13 @@ class CtpTdApi(TdApi):
     def onFrontConnected(self):
         """服务器连接"""
         self.connected = True
-        self.gateway.on_connected(CallBackData(self.api_name))
+        self.login()
 
     def onFrontDisconnected(self, n):
         """服务器断开"""
         self.connected = False
         self.logged_in = False
-        self.gateway.on_disconnected(CallBackData(self.api_name, n))
+        self.gateway.td_logged_in = False
 
     def onHeartBeatWarning(self, n):
         """心跳报警"""
@@ -201,7 +205,8 @@ class CtpTdApi(TdApi):
         """验证客户端回报"""
         if error['ErrorID'] == 0:
             self.authenticated = True
-            self.gateway.on_authenticate(CallBackData(self.api_name, n))
+            if self.require_authentication:
+                self.gateway.td_logged_in = True
 
     def onRspUserLogin(self, data, error, n, last):
         """登陆回报"""
@@ -209,7 +214,10 @@ class CtpTdApi(TdApi):
             self.front_id = str(data['FrontID'])
             self.session_id = str(data['SessionID'])
             self.logged_in = True
-            self.gateway.on_login(CallBackData(self.api_name, n))
+            if self.require_authentication:
+                self.authenticate()
+            else:
+                self.gateway.td_logged_in = True
         else:
             self.gateway.on_err(CallBackData(self.api_name, n, error))
 
@@ -217,7 +225,7 @@ class CtpTdApi(TdApi):
         """登出回报"""
         if error['ErrorID'] == 0:
             self.logged_in = False
-            self.gateway.on_logout(CallBackData(self.api_name, n))
+            self.gateway.td_logged_in = False
         else:
             self.gateway.on_err(CallBackData(self.api_name, n, error)
 
@@ -684,24 +692,29 @@ class CtpTdApi(TdApi):
             if not os.path.exists(self.temp_path):
                 os.makedirs(self.temp_path)
             self.createFtdcTraderApi(self.temp_path)
-
             self.subscribePrivateTopic(0)
             self.subscribePublicTopic(0)
-
             self.registerFront(self.address)
-
             self.init()
+        else:
+            self.login()
 
     def login(self):
         """连接服务器"""
-        if self.userID and self.password and self.brokerID:
-            req = {
-                'UserID': self.user_id,
-                'Password': self.password,
-                'BrokerID': self.broker_id,
-            }
-            self.req_id += 1
-            self.reqUserLogin(req, self.req_id)
+        if not self.logged_in:
+            if self.userID and self.password and self.brokerID:
+                req = {
+                    'UserID': self.user_id,
+                    'Password': self.password,
+                    'BrokerID': self.broker_id,
+                }
+                self.req_id += 1
+                self.reqUserLogin(req, self.req_id)
+        else:
+            if not self.require_authentication:
+                self.gateway.td_logged_in = True
+            else:
+                self.authenticate()
         return self.req_id
 
     def authenticate(self):
