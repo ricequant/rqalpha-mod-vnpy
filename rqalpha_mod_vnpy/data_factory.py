@@ -75,7 +75,7 @@ class DataFactory(object):
         order_req.currency = CURRENCY_CNY
         order_req.productClass = PRODUCT_FUTURES
 
-        order_req.orderID = order
+        order_req.orderID = order.order_id
 
         return order_req
 
