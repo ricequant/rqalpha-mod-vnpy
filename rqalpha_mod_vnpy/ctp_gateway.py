@@ -429,9 +429,68 @@ class RqCtpTdApi(CtpTdApi):
         self.gateway.onQryOrder(order)
 
     def onRtnOrder(self, data):
-        print('*' * 20)
-        print(data)
         super(RqCtpTdApi, self).onRtnOrder(data)
+
+    def sendOrder(self, orderReq):
+        """发单"""
+        self.reqID += 1
+
+        req = {}
+
+        req['InstrumentID'] = orderReq.symbol
+        req['LimitPrice'] = orderReq.price
+        req['VolumeTotalOriginal'] = orderReq.volume
+
+        # 下面如果由于传入的类型本接口不支持，则会返回空字符串
+        req['OrderPriceType'] = priceTypeMap.get(orderReq.priceType, '')
+        req['Direction'] = directionMap.get(orderReq.direction, '')
+        req['CombOffsetFlag'] = offsetMap.get(orderReq.offset, '')
+
+        req['OrderRef'] = str(orderReq.orderID)
+        req['InvestorID'] = self.userID
+        req['UserID'] = self.userID
+        req['BrokerID'] = self.brokerID
+
+        req['CombHedgeFlag'] = defineDict['THOST_FTDC_HF_Speculation']  # 投机单
+        req['ContingentCondition'] = defineDict['THOST_FTDC_CC_Immediately']  # 立即发单
+        req['ForceCloseReason'] = defineDict['THOST_FTDC_FCC_NotForceClose']  # 非强平
+        req['IsAutoSuspend'] = 0  # 非自动挂起
+        req['TimeCondition'] = defineDict['THOST_FTDC_TC_GFD']  # 今日有效
+        req['VolumeCondition'] = defineDict['THOST_FTDC_VC_AV']  # 任意成交量
+        req['MinVolume'] = 1  # 最小成交量为1
+
+        # 判断FAK和FOK
+        if orderReq.priceType == PRICETYPE_FAK:
+            req['OrderPriceType'] = defineDict["THOST_FTDC_OPT_LimitPrice"]
+            req['TimeCondition'] = defineDict['THOST_FTDC_TC_IOC']
+            req['VolumeCondition'] = defineDict['THOST_FTDC_VC_AV']
+        if orderReq.priceType == PRICETYPE_FOK:
+            req['OrderPriceType'] = defineDict["THOST_FTDC_OPT_LimitPrice"]
+            req['TimeCondition'] = defineDict['THOST_FTDC_TC_IOC']
+            req['VolumeCondition'] = defineDict['THOST_FTDC_VC_CV']
+
+        self.reqOrderInsert(req, self.reqID)
+
+        # 返回订单号（字符串），便于某些算法进行动态管理
+        vtOrderID = '.'.join([self.gatewayName, str(self.orderRef)])
+        return vtOrderID
+
+    def cancelOrder(self, cancelOrderReq):
+        """撤单"""
+        self.reqID += 1
+        req = {}
+
+        req['InstrumentID'] = cancelOrderReq.symbol
+        req['ExchangeID'] = cancelOrderReq.exchange
+        req['OrderRef'] = cancelOrderReq.orderID
+        req['FrontID'] = self.frontID
+        req['SessionID'] = self.sessionID
+
+        req['ActionFlag'] = defineDict['THOST_FTDC_AF_Delete']
+        req['BrokerID'] = self.brokerID
+        req['InvestorID'] = self.userID
+
+        self.reqOrderAction(req, self.reqID)
 
     def qrySettlementInfoConfirm(self):
         # 登录成功后应确认结算信息

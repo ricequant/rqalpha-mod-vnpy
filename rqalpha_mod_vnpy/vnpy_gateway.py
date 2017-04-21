@@ -66,6 +66,12 @@ class RQCommissionData(VtBaseData):
         self.CloseTodayRatioByVolume = EMPTY_FLOAT
 
 
+class RQOrderReq(VtOrderReq):
+    def __init__(self):
+        super(RQOrderReq, self).__init__()
+        self.orderID = EMPTY_INT
+
+
 # ------------------------------------ 扩展事件引擎 ------------------------------------
 class RQVNEventEngine(EventEngine2):
     def __init__(self):

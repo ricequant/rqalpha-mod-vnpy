@@ -27,6 +27,7 @@ from rqalpha.const import COMMISSION_TYPE, MARGIN_TYPE
 from .vnpy import OFFSET_OPEN, DIRECTION_SHORT, DIRECTION_LONG
 from .vnpy import STATUS_NOTTRADED, STATUS_PARTTRADED, CURRENCY_CNY, PRODUCT_FUTURES
 from .vnpy import VtOrderReq, VtCancelOrderReq, VtSubscribeReq, VtTradeData, VtOrderData
+from .vnpy_gateway import RQOrderReq
 from .utils import make_underlying_symbol, make_order_book_id, make_order
 from .utils import make_order_from_vnpy_trade
 from .utils import SIDE_MAPPING, ORDER_TYPE_MAPPING, POSITION_EFFECT_MAPPING
@@ -63,7 +64,7 @@ class DataFactory(object):
         if contract is None:
             return None
 
-        order_req = VtOrderReq()
+        order_req = RQOrderReq()
         order_req.symbol = contract['symbol']
         order_req.exchange = contract['exchange']
         order_req.price = order.price
@@ -74,18 +75,17 @@ class DataFactory(object):
         order_req.currency = CURRENCY_CNY
         order_req.productClass = PRODUCT_FUTURES
 
+        order_req.orderID = order
+
         return order_req
 
     def make_cancel_order_req(self, order):
-        vnpy_order = self._data_cache.vnpy_order_dict.get(order.order_id)
-        if vnpy_order is None:
-            return
+        symbol = self._data_cache.order_book_id_symbol_map.get(order.order_book_id)
+        contract = self._data_cache.contract_cache.get(symbol)
         cancel_order_req = VtCancelOrderReq()
-        cancel_order_req.symbol = vnpy_order.symbol
-        cancel_order_req.exchange = vnpy_order.exchange
-        cancel_order_req.sessionID = vnpy_order.sessionID
-        cancel_order_req.orderID = vnpy_order.orderID
-
+        cancel_order_req.symbol = symbol
+        cancel_order_req.exchange = contract['exchange']
+        cancel_order_req.orderID = order.order_id
         return cancel_order_req
 
     def make_subscribe_req(self, order_book_id):
