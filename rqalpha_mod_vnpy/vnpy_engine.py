@@ -213,6 +213,7 @@ class RQVNPYEngine(object):
         self.vnpy_gateway.qrySettlementInfoConfirm()
         self.vnpy_gateway.qryContract()
 
+        self.vnpy_gateway.qryOrder()
         self.vnpy_gateway.qryAccount()
         self.vnpy_gateway.qryAccount()
         self.vnpy_gateway.qryPosition()
