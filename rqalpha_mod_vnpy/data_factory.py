@@ -15,6 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import six
+
 from dateutil.parser import parse
 from six import iteritems
 
@@ -105,6 +107,7 @@ class DataFactory(object):
         positions = Positions(FuturePosition)
         for order_book_id, position_dict in iteritems(self._data_cache.position_cache_before_init):
             position = FuturePosition(order_book_id)
+
             if 'prev_settle_price' in position_dict and 'buy_old_quantity' in position_dict:
                 position._buy_old_holding_list = [
                     (position_dict['prev_settle_price'], position_dict['buy_old_quantity'])]
@@ -127,49 +130,41 @@ class DataFactory(object):
                 position._sell_avg_open_price = position_dict['sell_avg_open_price']
 
             if 'trades' in position_dict:
-                accum_buy_open_quantity = 0.
-                accum_sell_open_quantity = 0.
 
                 buy_today_quantity = position_dict[
                     'buy_today_quantity'] if 'buy_today_quantity' in position_dict else 0
                 sell_today_quantity = position_dict[
                     'sell_today_quantity'] if 'sell_today_quantity' in position_dict else 0
 
-                trades = sorted(position_dict['trades'], key=lambda t: parse(t.tradeTime), reverse=True)
-
+                trades = sorted(position_dict['trades'], key=lambda t: t.tradeID, reverse=True)
                 buy_today_holding_list = []
                 sell_today_holding_list = []
+
                 for vnpy_trade in trades:
                     if vnpy_trade.direction == DIRECTION_LONG:
                         if vnpy_trade.offset == OFFSET_OPEN:
-                            accum_buy_open_quantity += vnpy_trade.volume
-                            if accum_buy_open_quantity == buy_today_quantity:
-                                break
-                            if accum_buy_open_quantity > buy_today_quantity:
-                                buy_today_holding_list.append((vnpy_trade.price,
-                                                                buy_today_quantity - accum_buy_open_quantity + vnpy_trade.volume))
-                                break
                             buy_today_holding_list.append((vnpy_trade.price, vnpy_trade.volume))
                     else:
                         if vnpy_trade.offset == OFFSET_OPEN:
-                            accum_sell_open_quantity += vnpy_trade.volume
-                            if accum_sell_open_quantity == sell_today_quantity:
-                                break
-                            if accum_sell_open_quantity > sell_today_quantity:
-                                sell_today_holding_list.append((vnpy_trade.price,
-                                                                 sell_today_quantity - accum_sell_open_quantity + vnpy_trade.volume))
-                                break
                             sell_today_holding_list.append((vnpy_trade.price, vnpy_trade.volume))
 
+                self.process_today_holding_list(buy_today_quantity, buy_today_holding_list)
+                self.process_today_holding_list(sell_today_quantity, sell_today_holding_list)
                 position._buy_today_holding_list = buy_today_holding_list
                 position._sell_today_holding_list = sell_today_holding_list
 
             positions[order_book_id] = position
+
         return positions
 
     def make_account_before_init(self):
-        total_cash = self._data_cache.account_cache_before_init['yesterday_portfolio_value']
+        static_value = self._data_cache.account_cache_before_init['yesterday_portfolio_value']
         positions = self.make_positions_before_init()
+        holding_pnl = sum(position.holding_pnl for position in six.itervalues(positions))
+        realized_pnl = sum(position.realized_pnl for position in six.itervalues(positions))
+        cost = sum(position.transaction_cost for position in six.itervalues(positions))
+        margin = sum(position.margin for position in six.itervalues(positions))
+        total_cash = static_value + holding_pnl + realized_pnl - cost - margin
 
         account = FutureAccount(total_cash, positions)
         frozen_cash = 0.
@@ -329,3 +324,19 @@ class DataFactory(object):
 
     def get_contract_cache(self):
         return self._data_cache.contract_cache
+
+    def process_today_holding_list(self, today_quantity, holding_list):
+        # check if list is empty
+        if not holding_list:
+            return
+        cum_quantity = sum(quantity for price, quantity in holding_list)
+        left_quantity = cum_quantity - today_quantity
+        while left_quantity > 0:
+            oldest_price, oldest_quantity = holding_list.pop()
+            if oldest_quantity > left_quantity:
+                consumed_quantity = left_quantity
+                holding_list.append(oldest_price, oldest_quantity - left_quantity)
+            else:
+                consumed_quantity = oldest_quantity
+            left_quantity -= consumed_quantity
+
