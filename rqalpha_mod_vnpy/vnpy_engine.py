@@ -28,7 +28,7 @@ from rqalpha.environment import Environment
 from .vnpy import *
 from .utils import make_order_book_id, make_trade, make_tick
 
-from .vnpy_gateway import EVENT_COMMISSION
+from .vnpy_gateway import EVENT_COMMISSION, EVENT_QRY_ORDER
 from .ctp_gateway import RQCtpGateway
 
 _engine = None
@@ -95,9 +95,7 @@ class RQVNPYEngine(object):
         vnpy_order_id = vnpy_order.vtOrderID
         order = self._data_factory.get_order(vnpy_order)
 
-        if not self._account_inited:
-            self._data_factory.cache_vnpy_order_before_init(vnpy_order)
-        else:
+        if self._account_inited:
             account = Environment.get_instance().get_account(order.order_book_id)
 
             order.active()
@@ -118,6 +116,12 @@ class RQVNPYEngine(object):
                 else:
                     order.mark_rejected('Order was rejected or cancelled by vnpy.')
                     self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_UNSOLICITED_UPDATE, account=account, order=order))
+
+    def on_qry_order(self, event):
+        vnpy_order = event.dict_['data']
+        system_log.debug("on_qry_order {}", vnpy_order.__dict__)
+        if not self._account_inited:
+            self._data_factory.cache_vnpy_order_before_init(vnpy_order)
 
     def get_open_orders(self, order_book_id):
         return self._data_factory.get_open_orders(order_book_id)
@@ -240,5 +244,6 @@ class RQVNPYEngine(object):
         self.event_engine.register(EVENT_ACCOUNT, self.on_account)
         self.event_engine.register(EVENT_POSITION, self.on_positions)
         self.event_engine.register(EVENT_COMMISSION, self.on_commission)
+        self.event_engine.register(EVENT_QRY_ORDER, self.on_qry_order)
 
         self._env.event_bus.add_listener(EVENT.POST_UNIVERSE_CHANGED, self.on_universe_changed)

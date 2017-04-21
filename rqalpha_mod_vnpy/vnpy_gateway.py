@@ -18,8 +18,7 @@
 from Queue import Empty
 from .vnpy import *
 
-EVENT_POSITION_EXTRA = 'ePositionExtra'
-EVENT_CONTRACT_EXTRA = 'eContractExtra'
+EVENT_QRY_ORDER = 'eQryOrder'
 EVENT_COMMISSION = 'eCommission'
 
 

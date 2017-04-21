@@ -19,7 +19,7 @@ from datetime import datetime
 from rqalpha.utils.logger import system_log
 
 from .vnpy import *
-from .vnpy_gateway import RQPositionData, RQContractData, RQCommissionData, EVENT_COMMISSION
+from .vnpy_gateway import RQPositionData, RQContractData, RQCommissionData, EVENT_COMMISSION, EVENT_QRY_ORDER
 from .utils import make_underlying_symbol
 
 
@@ -75,13 +75,10 @@ class RQCtpGateway(CtpGateway):
 
     def onQryOrder(self, order):
         if not self._order_received:
-            event1 = Event(type_=EVENT_ORDER)
+            event1 = Event(type_=EVENT_QRY_ORDER)
             event1.dict_['data'] = order
             self.eventEngine.put(event1)
         self._order_received = True
-
-    def onOrder(self, order):
-        pass
 
     def connect(self):
         userID = str(self.login_dict.userID)
@@ -430,6 +427,11 @@ class RqCtpTdApi(CtpTdApi):
 
         # 推送
         self.gateway.onQryOrder(order)
+
+    def onRtnOrder(self, data):
+        print('*' * 20)
+        print(data)
+        super(RqCtpTdApi, self).onRtnOrder(data)
 
     def qrySettlementInfoConfirm(self):
         # 登录成功后应确认结算信息
