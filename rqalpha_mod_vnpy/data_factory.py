@@ -181,8 +181,8 @@ class DataFactory(object):
     def cache_order(self, vnpy_order_id, order):
         self._data_cache.order_dict[vnpy_order_id] = order
 
-    def cache_open_order(self, vnpy_order_id, order):
-        self._data_cache.open_order_dict[vnpy_order_id] = order
+    def cache_open_order(self, order):
+        self._data_cache.open_order_dict[order.order_id] = order
 
     def cache_vnpy_order(self, order_id, vnpy_order):
         self._data_cache.vnpy_order_dict[order_id] = vnpy_order
@@ -250,6 +250,8 @@ class DataFactory(object):
 
     def cache_vnpy_order_before_init(self, vnpy_order):
         self._data_cache.order_cache_before_init.append(vnpy_order)
+        if vnpy_order.status == STATUS_NOTTRADED or vnpy_order.status == STATUS_PARTTRADED:
+            self.cache_open_order(make_order(vnpy_order))
 
     def cache_vnpy_trade_before_init(self, vnpy_trade):
         order_book_id = make_order_book_id(vnpy_trade.symbol)
@@ -304,9 +306,9 @@ class DataFactory(object):
         else:
             return [order for order in self._data_cache.open_order_dict.values() if order.order_book_id == order_book_id]
 
-    def del_open_order(self, vnpy_order_id):
-        if vnpy_order_id in self._data_cache.open_order_dict:
-            del self._data_cache.open_order_dict[vnpy_order_id]
+    def del_open_order(self, order_id):
+        if order_id in self._data_cache.open_order_dict:
+            del self._data_cache.open_order_dict[order_id]
 
     def get_symbol(self, order_book_id):
         return self._data_cache.order_book_id_symbol_map.get(order_book_id)

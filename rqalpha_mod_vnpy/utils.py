@@ -90,9 +90,11 @@ def make_order(vnpy_order):
     side = SIDE_REVERSE[vnpy_order.direction]
     style = LimitOrder(vnpy_order.price)
     position_effect = make_position_effect(vnpy_order.exchange, vnpy_order.offset)
+    order_id = vnpy_order.orderID
 
     order = Order.__from_create__(calendar_dt, trading_dt, order_book_id, quantity, side, style, position_effect)
     order._filled_quantity = vnpy_order.totalVolume
+    order._order_id = order_id
 
     return order
 

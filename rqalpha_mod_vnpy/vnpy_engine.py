@@ -92,7 +92,6 @@ class RQVNPYEngine(object):
         if vnpy_order.status == STATUS_UNKNOWN:
             return
 
-        vnpy_order_id = vnpy_order.vtOrderID
         order = self._data_factory.get_order(vnpy_order)
 
         if self._account_inited:
@@ -105,11 +104,11 @@ class RQVNPYEngine(object):
             self._data_factory.cache_vnpy_order(order.order_id, vnpy_order)
 
             if vnpy_order.status == STATUS_NOTTRADED or vnpy_order.status == STATUS_PARTTRADED:
-                self._data_factory.cache_open_order(vnpy_order_id, order)
+                self._data_factory.cache_open_order(order)
             elif vnpy_order.status == STATUS_ALLTRADED:
-                self._data_factory.del_open_order(vnpy_order_id)
+                self._data_factory.del_open_order(int(vnpy_order.orderID))
             elif vnpy_order.status == STATUS_CANCELLED:
-                self._data_factory.del_open_order(vnpy_order_id)
+                self._data_factory.del_open_order(int(vnpy_order.orderID))
                 if order.status == ORDER_STATUS.PENDING_CANCEL:
                     order.mark_cancelled("%d order has been cancelled by user." % order.order_id)
                     self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_CANCELLATION_PASS, account=account, order=order))
