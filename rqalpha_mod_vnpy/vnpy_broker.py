@@ -49,7 +49,7 @@ class VNPYBroker(AbstractBroker):
         pass
 
     def get_open_orders(self, order_book_id=None):
-        return self._engine.open_orders
+        return self._engine.get_open_orders(order_book_id)
 
     def submit_order(self, order):
         self._engine.send_order(order)
