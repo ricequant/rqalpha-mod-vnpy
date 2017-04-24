@@ -237,6 +237,7 @@ class RqCtpTdApi(CtpTdApi):
         self.pos_buffer_dict = {}
         self.contract_buffer_dict = {}
         self.commission_buffer_dict = {}
+        self.order_buffer_dict = {}
 
     def onFrontConnected(self):
         super(RqCtpTdApi, self).onFrontConnected()
@@ -391,6 +392,7 @@ class RqCtpTdApi(CtpTdApi):
         system_log.error('CTP交易服务器撤单错误，错误代码：%s，错误信息：%s' % (str(error['ErrorID']), error['ErrorMsg'].decode('gbk')))
 
     def onRspQryOrder(self, data, error, n, last):
+
         newref = data['OrderRef']
         try:
             self.orderRef = max(self.orderRef, int(newref))
@@ -406,10 +408,6 @@ class RqCtpTdApi(CtpTdApi):
         order.vtSymbol = order.symbol  # '.'.join([order.symbol, order.exchange])
 
         order.orderID = data['OrderRef']
-        # CTP的报单号一致性维护需要基于frontID, sessionID, orderID三个字段
-        # 但在本接口设计中，已经考虑了CTP的OrderRef的自增性，避免重复
-        # 唯一可能出现OrderRef重复的情况是多处登录并在非常接近的时间内（几乎同时发单）
-        # 考虑到VtTrader的应用场景，认为以上情况不会构成问题
         order.vtOrderID = '.'.join([self.gatewayName, order.orderID])
 
         order.direction = directionMapReverse.get(data['Direction'], DIRECTION_UNKNOWN)
@@ -425,8 +423,11 @@ class RqCtpTdApi(CtpTdApi):
         order.frontID = data['FrontID']
         order.sessionID = data['SessionID']
 
+        self.order_buffer_dict[order.orderID] = order
+
         # 推送
-        self.gateway.onQryOrder(order)
+        if last:
+            self.gateway.onQryOrder(self.order_buffer_dict)
 
     def onRtnOrder(self, data):
         super(RqCtpTdApi, self).onRtnOrder(data)
