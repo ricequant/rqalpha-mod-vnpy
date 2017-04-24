@@ -18,8 +18,7 @@
 from Queue import Empty
 from .vnpy import *
 
-EVENT_POSITION_EXTRA = 'ePositionExtra'
-EVENT_CONTRACT_EXTRA = 'eContractExtra'
+EVENT_QRY_ORDER = 'eQryOrder'
 EVENT_COMMISSION = 'eCommission'
 
 
@@ -65,6 +64,12 @@ class RQCommissionData(VtBaseData):
         self.CloseRatioByVolume = EMPTY_FLOAT
         self.CloseTodayRatioByMoney = EMPTY_FLOAT
         self.CloseTodayRatioByVolume = EMPTY_FLOAT
+
+
+class RQOrderReq(VtOrderReq):
+    def __init__(self):
+        super(RQOrderReq, self).__init__()
+        self.orderID = EMPTY_INT
 
 
 # ------------------------------------ 扩展事件引擎 ------------------------------------

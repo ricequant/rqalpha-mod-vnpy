@@ -23,7 +23,7 @@ from vtConstant import *
 from eventEngine import EventEngine2, Event
 from vtGateway import VtOrderReq, VtCancelOrderReq, VtSubscribeReq, VtBaseData, VtTradeData, VtOrderData, VtPositionData, VtContractData, VtTickData
 from eventType import EVENT_CONTRACT, EVENT_ORDER, EVENT_TRADE, EVENT_TICK, EVENT_ACCOUNT, EVENT_POSITION
-from gateway.ctpGateway.ctpGateway import CtpGateway, CtpMdApi, CtpTdApi, posiDirectionMapReverse, exchangeMapReverse, productClassMapReverse, MdApi, TdApi, directionMapReverse, offsetMapReverse, statusMapReverse
+from gateway.ctpGateway.ctpGateway import CtpGateway, CtpMdApi, CtpTdApi, posiDirectionMapReverse, exchangeMapReverse, productClassMapReverse, MdApi, TdApi, directionMapReverse, offsetMapReverse, statusMapReverse, priceTypeMap, directionMap, offsetMap
 from gateway.ctpGateway.ctpDataType import defineDict
 
 
@@ -34,6 +34,8 @@ __all__ = [
     'DIRECTION_UNKNOWN',
     'PRICETYPE_MARKETPRICE',
     'PRICETYPE_LIMITPRICE',
+    'PRICETYPE_FAK',
+    'PRICETYPE_FOK',
     'OFFSET_OPEN',
     'OFFSET_CLOSE',
     'OFFSET_CLOSETODAY',
@@ -45,6 +47,7 @@ __all__ = [
     'STATUS_CANCELLED',
     'EMPTY_STRING',
     'EMPTY_FLOAT',
+    'EMPTY_INT',
     'PRODUCT_FUTURES',
     'PRODUCT_UNKNOWN',
     'CURRENCY_CNY',
@@ -84,6 +87,9 @@ __all__ = [
     'directionMapReverse',
     'offsetMapReverse',
     'statusMapReverse',
+    'priceTypeMap',
+    'directionMap',
+    'offsetMap',
 
     'defineDict',
 ]
