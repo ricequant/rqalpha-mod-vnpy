@@ -167,7 +167,7 @@ class CtpMdApi(MdApi):
 
 class CtpTdApi(TdApi):
 
-    def __init__(self, gateway, temp_path, user_id, password, broker_id, address, auth_code=None, user_production_info=None, api_name='ctp_td'):
+    def __init__(self, gateway, temp_path, user_id, password, broker_id, address, auth_code, user_production_info, api_name='ctp_td'):
         super(CtpTdApi, self).__init__()
 
         self.gateway = gateway
