@@ -321,7 +321,8 @@ class CtpTdApi(TdApi):
         """"""
         pass
 
-    def onRspQryInvestorPosition(self, data, error, n, last):
+    @query_in_sync
+    def onRspQryInvestorPosition(self, data, last):
         """持仓查询回报"""
 
         if not data['InstrumentID']:
@@ -334,12 +335,12 @@ class CtpTdApi(TdApi):
             self.pos_cache[order_book_id].update_position(data)
 
         if last:
-            self.gateway.on_position(CallBackData(self.api_name, n, self.pos_cache))
+            return self.pos_cache
 
-    def onRspQryTradingAccount(self, data, error, n, last):
+    @query_in_sync
+    def onRspQryTradingAccount(self, data, last):
         """资金账户查询回报"""
-        account_dict = AccountDict(data)
-        self.gateway.on_account(CallBackData(self.api_name, n, account_dict))
+        return AccountDict(data)
 
     def onRspQryInvestor(self, data, error, n, last):
         """"""
@@ -353,10 +354,10 @@ class CtpTdApi(TdApi):
         """"""
         pass
 
-    def onRspQryInstrumentCommissionRate(self, data, error, n, last):
+    @query_in_sync
+    def onRspQryInstrumentCommissionRate(self, data, last):
         """请求查询合约手续费率响应"""
-        commission_dict = CommissionDict(data)
-        self.gateway.on_commission(CallBackData(self.api_name, n, commission_dict))
+        return CommissionDict(data)
 
     def onRspQryExchange(self, data, error, n, last):
         """"""
@@ -366,7 +367,8 @@ class CtpTdApi(TdApi):
         """"""
         pass
 
-    def onRspQryInstrument(self, data, error, n, last):
+    @query_in_sync
+    def onRspQryInstrument(self, data, last):
         """合约查询回报"""
 
         if not data['InstrumentID']:
@@ -376,7 +378,7 @@ class CtpTdApi(TdApi):
         self.ins_cache[ins_dict.order_book_id] = ins_dict
 
         if last:
-            self.gateway.on_instrument(CallBackData(self.api_name, n, self.ins_cache))
+            return self.ins_cache
 
 
     def onRspQryDepthMarketData(self, data, error, n, last):
@@ -501,7 +503,8 @@ class CtpTdApi(TdApi):
 
     def onRtnOrder(self, data):
         """报单回报"""
-        pass
+        order_dict = OrderDict(data)
+        self.gateway.on_order(order_dict)
 
     def onRtnTrade(self, data):
         """成交回报"""
@@ -753,6 +756,7 @@ class CtpTdApi(TdApi):
         return self.req_id
 
     def qryInstrument(self):
+        self.ins_cache = {}
         self.req_id += 1
         self.reqQryInstrument({}, self.req_id)
         return self.req_id
@@ -776,6 +780,7 @@ class CtpTdApi(TdApi):
 
     def qryPosition(self):
         """查询持仓"""
+        self.pos_cache = {}
         self.req_id += 1
         req = {
             'BrokerID': self.broker_id,
@@ -786,6 +791,7 @@ class CtpTdApi(TdApi):
 
     def qryOrder(self):
         """订单查询"""
+        self.order_cache = {}
         self.req_id += 1
         req = {
             'BrokerID': self.broker_id,
@@ -829,8 +835,8 @@ class CtpTdApi(TdApi):
             'InstrumentID': self.gateway.get_instrument_id(order.order_book_id),
             'ExchangeID': self.gateway.get_exchange_id(order.order_book_id),
             'OrderRef': str(order.order_id),
-            'FrontID': self.front_id,
-            'SessionID': self.session_id,
+            'FrontID': int(self.front_id),
+            'SessionID': int(self.session_id),
 
             'ActionFlag': defineDict['THOST_FTDC_AF_Delete'],
             'BrokerID': self.broker_id,
