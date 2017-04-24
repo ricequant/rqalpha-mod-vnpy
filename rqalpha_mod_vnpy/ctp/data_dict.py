@@ -20,6 +20,9 @@ class DataDict(dict):
         else:
             super(DataDict, self).__init__()
 
+    def copy(self):
+        return DataDict(super(DataDict, self).copy())
+
     def __getattr__(self, item):
         return self.__getitem__(item)
 

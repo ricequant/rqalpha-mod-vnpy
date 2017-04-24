@@ -45,6 +45,7 @@ POSITION_EFFECT_MAPPING = {
 def query_in_sync(func):
     @wraps
     def wrapper(api, data, error, n, last):
+        api.req_id = max(api.req_id, n)
         result = func(api, data, last)
         if last:
             api.gateway.on_query(api.api_name, n, result)
@@ -199,7 +200,10 @@ class CtpTdApi(TdApi):
     def onFrontConnected(self):
         """服务器连接"""
         self.connected = True
-        self.login()
+        if self.require_authentication:
+            self.authenticate()
+        else:
+            self.login()
 
     def onFrontDisconnected(self, n):
         """服务器断开"""
@@ -215,8 +219,7 @@ class CtpTdApi(TdApi):
         """验证客户端回报"""
         if error['ErrorID'] == 0:
             self.authenticated = True
-            if self.require_authentication:
-                self.gateway.td_logged_in = True
+            self.login()
 
     def onRspUserLogin(self, data, error, n, last):
         """登陆回报"""
@@ -224,10 +227,7 @@ class CtpTdApi(TdApi):
             self.front_id = str(data['FrontID'])
             self.session_id = str(data['SessionID'])
             self.logged_in = True
-            if self.require_authentication:
-                self.authenticate()
-            else:
-                self.gateway.td_logged_in = True
+            self.qrySettlementInfoConfirm()
         else:
             self.gateway.on_err(CallBackData(self.api_name, n, error))
 
@@ -713,7 +713,10 @@ class CtpTdApi(TdApi):
             self.registerFront(self.address)
             self.init()
         else:
-            self.login()
+            if self.require_authentication:
+                self.authenticate()
+            else:
+                self.login()
 
     def login(self):
         """连接服务器"""
@@ -726,16 +729,11 @@ class CtpTdApi(TdApi):
                 }
                 self.req_id += 1
                 self.reqUserLogin(req, self.req_id)
-        else:
-            if not self.require_authentication:
-                self.gateway.td_logged_in = True
-            else:
-                self.authenticate()
         return self.req_id
 
     def authenticate(self):
         """申请验证"""
-        if self.require_authentication:
+        if self.authenticated:
             req = {
                 'UserID': self.user_id,
                 'BrokerID': self.broker_id,
@@ -744,6 +742,8 @@ class CtpTdApi(TdApi):
             }
             self.req_id += 1
             self.reqAuthenticate(req, self.req_id)
+        else:
+            self.login()
         return self.req_id
 
     def qrySettlementInfoConfirm(self):
@@ -798,6 +798,7 @@ class CtpTdApi(TdApi):
             'InvestorID': self.user_id,
         }
         self.reqQryOrder(req, self.req_id)
+        return self.req_id
 
     def sendOrder(self, order):
         """发单"""
