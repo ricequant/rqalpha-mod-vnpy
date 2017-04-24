@@ -118,10 +118,11 @@ class RQVNPYEngine(object):
                     self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_UNSOLICITED_UPDATE, account=account, order=order))
 
     def on_qry_order(self, event):
-        vnpy_order = event.dict_['data']
-        system_log.debug("on_qry_order {}", vnpy_order.__dict__)
+        vnpy_order_dict = event.dict_['data']
+        system_log.debug("on_qry_order {}", str(vnpy_order_dict.keys()))
         if not self._account_inited:
-            self._data_factory.cache_vnpy_order_before_init(vnpy_order)
+            for order_id, vnpy_order in iteritems(vnpy_order_dict):
+                self._data_factory.cache_vnpy_order_before_init(vnpy_order)
 
     def get_open_orders(self, order_book_id):
         return self._data_factory.get_open_orders(order_book_id)
