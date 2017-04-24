@@ -17,7 +17,6 @@
 
 import six
 
-from dateutil.parser import parse
 from six import iteritems
 
 from rqalpha.model.position import Positions
@@ -26,7 +25,7 @@ from rqalpha.model.account.future_account import FutureAccount, margin_of
 from rqalpha.const import COMMISSION_TYPE, MARGIN_TYPE
 from .vnpy import OFFSET_OPEN, DIRECTION_SHORT, DIRECTION_LONG
 from .vnpy import STATUS_NOTTRADED, STATUS_PARTTRADED, CURRENCY_CNY, PRODUCT_FUTURES
-from .vnpy import VtOrderReq, VtCancelOrderReq, VtSubscribeReq, VtTradeData, VtOrderData
+from .vnpy import VtCancelOrderReq, VtSubscribeReq, VtTradeData, VtOrderData
 from .vnpy_gateway import RQOrderReq
 from .utils import make_underlying_symbol, make_order_book_id, make_order
 from .utils import make_order_from_vnpy_trade
@@ -178,8 +177,8 @@ class DataFactory(object):
         return account
 
     # ------------------------------------ put data cache ------------------------------------
-    def cache_order(self, vnpy_order_id, order):
-        self._data_cache.order_dict[vnpy_order_id] = order
+    def cache_order(self, order):
+        self._data_cache.order_dict[order.order_id] = order
 
     def cache_open_order(self, order):
         self._data_cache.open_order_dict[order.order_id] = order
@@ -292,7 +291,7 @@ class DataFactory(object):
 
     # ------------------------------------ read data cache ------------------------------------
     def get_order(self, vnpy_order_or_trade):
-        order = self._data_cache.order_dict.get(vnpy_order_or_trade.vtOrderID)
+        order = self._data_cache.order_dict.get(int(vnpy_order_or_trade.orderID))
         if order is None:
             if isinstance(vnpy_order_or_trade, VtTradeData):
                 order = make_order_from_vnpy_trade(vnpy_order_or_trade)

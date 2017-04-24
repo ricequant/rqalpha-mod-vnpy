@@ -72,8 +72,8 @@ class RQVNPYEngine(object):
         if order.is_final():
             return
 
-        vnpy_order_id = self.vnpy_gateway.sendOrder(order_req)
-        self._data_factory.cache_order(vnpy_order_id, order)
+        self.vnpy_gateway.sendOrder(order_req)
+        self._data_factory.cache_order(order)
 
     def cancel_order(self, order):
         account = Environment.get_instance().get_account(order.order_book_id)
