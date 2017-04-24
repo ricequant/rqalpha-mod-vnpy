@@ -42,6 +42,15 @@ POSITION_EFFECT_MAPPING = {
 }
 
 
+def query_in_sync(func):
+    @wraps
+    def wrapper(api, data, error, n, last):
+        result = func(api, data, last)
+        if last:
+            api.gateway.on_query(api.api_name, n, result)
+    return wrapper
+
+
 class CtpMdApi(MdApi):
     def __init__(self, gateway, temp_path, user_id, password, broker_id, address, api_name='ctp_md'):
         super(CtpMdApi, self).__init__()
@@ -183,6 +192,7 @@ class CtpTdApi(TdApi):
 
         self.pos_cache = {}
         self.ins_cache = {}
+        self.order_cache = {}
 
         self.api_name = api_name
 
@@ -299,10 +309,13 @@ class CtpTdApi(TdApi):
         """"""
         pass
 
-    def onRspQryOrder(self, data, error, n, last):
+    @query_in_sync
+    def onRspQryOrder(self, data, last):
         """报单回报"""
         order_dict = OrderDict(data)
-        self.gateway.on_order(order_dict)
+        self.order_cache[order_dict.order_id] = order_dict
+        if last:
+            return self.order_cache
 
     def onRspQryTrade(self, data, error, n, last):
         """"""
