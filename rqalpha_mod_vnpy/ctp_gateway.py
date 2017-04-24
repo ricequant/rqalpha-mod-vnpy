@@ -483,14 +483,13 @@ class RqCtpTdApi(CtpTdApi):
 
         req['InstrumentID'] = cancelOrderReq.symbol
         req['ExchangeID'] = cancelOrderReq.exchange
-        req['OrderRef'] = cancelOrderReq.orderID
-        req['FrontID'] = self.frontID
-        req['SessionID'] = self.sessionID
+        req['OrderRef'] = str(cancelOrderReq.orderID)
+        req['FrontID'] = int(self.frontID)
+        req['SessionID'] = int(self.sessionID)
 
         req['ActionFlag'] = defineDict['THOST_FTDC_AF_Delete']
         req['BrokerID'] = self.brokerID
         req['InvestorID'] = self.userID
-
         self.reqOrderAction(req, self.reqID)
 
     def qrySettlementInfoConfirm(self):
