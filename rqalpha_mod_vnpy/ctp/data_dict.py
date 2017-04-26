@@ -1,9 +1,8 @@
 from dateutil.parser import parse
 
-from rqalpha.const import SIDE, POSITION_EFFECT, ORDER_STATUS, COMMISSION_TYPE
+from rqalpha.const import SIDE, POSITION_EFFECT, ORDER_STATUS, COMMISSION_TYPE, MARGIN_TYPE
 
-from ..utils import make_order_book_id, make_underlying_symbol
-from ..utils import make_trading_dt
+from ..utils import make_order_book_id, make_underlying_symbol, is_future, make_trading_dt
 from ..vnpy import *
 
 
@@ -139,12 +138,14 @@ class AccountDict(DataDict):
 class InstrumentDict(DataDict):
     def __init__(self, data):
         super(InstrumentDict, self).__init__()
-        if len(data['InstrumentID']) <= 7 and not make_underlying_symbol(data['InstrumentID']).endswith('EFP'):
+        if is_future(data['InstrumentID']):
             self.order_book_id = make_order_book_id(data['InstrumentID'])
+            self.underlying_symbol = make_underlying_symbol(data['InstrumentID'])
             self.exchange_id = data['ExchangeID']
             self.contract_multiplier = data['VolumeMultiple']
             self.long_margin_ratio = data['LongMarginRatio']
             self.short_margin_ratio = data['ShortMarginRatio']
+            self.margin_type = MARGIN_TYPE.BY_MONEY
             self.instrument_id = data['InstrumentID']
         else:
             self.order_book_id = None
@@ -156,6 +157,7 @@ class InstrumentDict(DataDict):
 class CommissionDict(DataDict):
     def __init__(self, data):
         super(CommissionDict, self).__init__()
+        self.underlying_symbol = make_underlying_symbol(data['InstrumentID'])
         if data['OpenRatioByMoney'] == 0 and data['CloseRatioByMoney']:
             self.open_ratio = data['OpenRatioByVolume']
             self.close_ratio = data['CloseRatioByVolume']
@@ -192,6 +194,7 @@ class OrderDict(DataDict):
 
         if 'VolumeTraded' in data:
             self.filled_quantity = data['VolumeTraded']
+            self.unfilled_quantigy = self.quantity - self.unfilled_quantigy
 
         self.side = SIDE_REVERSE.get(data['Direction'], SIDE.BUY)
         self.price = data['LimitPrice']
