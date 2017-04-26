@@ -15,8 +15,7 @@
 # limitations under the License.
 
 from functools import wraps
-from inspect import getcallargs
-from rqalpha.model.tick import Tick
+import os
 from rqalpha.const import ORDER_TYPE, SIDE, POSITION_EFFECT
 
 from .data_dict import TickDict, PositionDict, AccountDict, InstrumentDict, OrderDict, TradeDict, CallBackData, CommissionDict
@@ -43,7 +42,7 @@ POSITION_EFFECT_MAPPING = {
 
 
 def query_in_sync(func):
-    @wraps
+    @wraps(func)
     def wrapper(api, data, error, n, last):
         api.req_id = max(api.req_id, n)
         result = func(api, data, last)
@@ -79,7 +78,6 @@ class CtpMdApi(MdApi):
         """服务器断开"""
         self.connected = False
         self.logged_in = False
-        self.gateway.md_logged_in = False
 
     def onHeartBeatWarning(self, n):
         """心跳报警"""
@@ -87,23 +85,21 @@ class CtpMdApi(MdApi):
 
     def onRspError(self, error, n, last):
         """错误回报"""
-        self.gateway.on_err(CallBackData(self.api_name, n, error))
+        self.gateway.on_err(error)
 
     def onRspUserLogin(self, data, error, n, last):
         """登陆回报"""
         if error['ErrorID'] == 0:
             self.logged_in = True
-            self.gateway.md_logged_in = True
         else:
-            self.gateway.on_err(CallBackData(self.api_name, n, error))
+            self.gateway.on_err(error)
 
     def onRspUserLogout(self, data, error, n, last):
         """登出回报"""
         if error['ErrorID'] == 0:
             self.logged_in = False
-            self.gateway.md_logged_in = False
         else:
-            self.gateway.on_err(CallBackData(self.api_name, n, error))
+            self.gateway.on_err(error)
 
     def onRspSubMarketData(self, data, error, n, last):
         """订阅合约回报"""
@@ -157,8 +153,6 @@ class CtpMdApi(MdApi):
             }
             self.req_id += 1
             self.reqUserLogin(req, self.req_id)
-        else:
-            self.gateway.md_logged_in = True
         return self.req_id
 
     def close(self):
@@ -209,7 +203,6 @@ class CtpTdApi(TdApi):
         """服务器断开"""
         self.connected = False
         self.logged_in = False
-        self.gateway.td_logged_in = False
 
     def onHeartBeatWarning(self, n):
         """心跳报警"""
@@ -220,6 +213,8 @@ class CtpTdApi(TdApi):
         if error['ErrorID'] == 0:
             self.authenticated = True
             self.login()
+        else:
+            self.gateway.on_err(error)
 
     def onRspUserLogin(self, data, error, n, last):
         """登陆回报"""
@@ -229,15 +224,14 @@ class CtpTdApi(TdApi):
             self.logged_in = True
             self.qrySettlementInfoConfirm()
         else:
-            self.gateway.on_err(CallBackData(self.api_name, n, error))
+            self.gateway.on_err(error)
 
     def onRspUserLogout(self, data, error, n, last):
         """登出回报"""
         if error['ErrorID'] == 0:
             self.logged_in = False
-            self.gateway.td_logged_in = False
         else:
-            self.gateway.on_err(CallBackData(self.api_name, n, error)
+            self.gateway.on_err(error)
 
     def onRspUserPasswordUpdate(self, data, error, n, last):
         """"""
@@ -262,7 +256,7 @@ class CtpTdApi(TdApi):
 
     def onRspOrderAction(self, data, error, n, last):
         """撤单错误（柜台）"""
-        self.gateway.on_err(CallBackData(self.api_name, n, error)
+        self.gateway.on_err(error)
 
     def onRspQueryMaxOrderVolume(self, data, error, n, last):
         """"""
@@ -270,9 +264,8 @@ class CtpTdApi(TdApi):
 
     def onRspSettlementInfoConfirm(self, data, error, n, last):
         """确认结算信息回报"""
-        self.gateway.on_log('CTP交易服务器结算信息确认成功')
-        self.gateway.on_settlement_info_confirm(CallBackData(self.api_name, n))
-
+        pass
+        
     def onRspRemoveParkedOrder(self, data, error, n, last):
         """"""
         pass
@@ -370,7 +363,6 @@ class CtpTdApi(TdApi):
     @query_in_sync
     def onRspQryInstrument(self, data, last):
         """合约查询回报"""
-
         if not data['InstrumentID']:
             return
 
@@ -499,7 +491,7 @@ class CtpTdApi(TdApi):
 
     def onRspError(self, error, n, last):
         """错误回报"""
-        self.gateway.on_err(CallBackData(self.api_name, n, error))
+        self.gateway.on_err(error)
 
     def onRtnOrder(self, data):
         """报单回报"""
@@ -514,13 +506,13 @@ class CtpTdApi(TdApi):
     def onErrRtnOrderInsert(self, data, error):
         """发单错误回报（交易所）"""
 
-        self.gateway.on_err(error['ErrorMsg'].decode('gbk'), error['ErrorID'])
+        self.gateway.on_err(error)
         order_dict = OrderDict(data, rejected=True)
         self.gateway.on_order(CallBackData(self.api_name, n, order_dict))
 
     def onErrRtnOrderAction(self, data, error):
         """撤单错误回报（交易所）"""
-        self.gateway.on_err(CallBackData(self.api_name, n, error))
+        self.gateway.on_err(error)
 
     def onRtnInstrumentStatus(self, data):
         """"""
@@ -721,14 +713,13 @@ class CtpTdApi(TdApi):
     def login(self):
         """连接服务器"""
         if not self.logged_in:
-            if self.userID and self.password and self.brokerID:
-                req = {
-                    'UserID': self.user_id,
-                    'Password': self.password,
-                    'BrokerID': self.broker_id,
-                }
-                self.req_id += 1
-                self.reqUserLogin(req, self.req_id)
+            req = {
+                'UserID': self.user_id,
+                'Password': self.password,
+                'BrokerID': self.broker_id,
+            }
+            self.req_id += 1
+            self.reqUserLogin(req, self.req_id)
         return self.req_id
 
     def authenticate(self):

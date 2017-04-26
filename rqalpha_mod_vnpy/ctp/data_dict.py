@@ -1,10 +1,10 @@
-import numpy as np
 from dateutil.parser import parse
 
 from rqalpha.const import SIDE, POSITION_EFFECT, ORDER_STATUS, COMMISSION_TYPE
 
 from ..utils import make_order_book_id, make_underlying_symbol
 from ..utils import make_trading_dt
+from ..vnpy import *
 
 
 SIDE_REVERSE = {
@@ -145,6 +145,7 @@ class InstrumentDict(DataDict):
             self.contract_multiplier = data['VolumeMultiple']
             self.long_margin_ratio = data['LongMarginRatio']
             self.short_margin_ratio = data['ShortMarginRatio']
+            self.instrument_id = data['InstrumentID']
         else:
             self.order_book_id = None
 
