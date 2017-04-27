@@ -1,4 +1,5 @@
 from dateutil.parser import parse
+import numpy as np
 
 from rqalpha.const import SIDE, POSITION_EFFECT, ORDER_STATUS, COMMISSION_TYPE, MARGIN_TYPE
 from rqalpha.model.order import LimitOrder
@@ -75,7 +76,8 @@ class TickDict(DataDict):
 
 
 class PositionDict(DataDict):
-    def __init__(self, data, contract_multiplier=1):
+    def __init__(self, data, ins_dict=None):
+
         super(PositionDict, self).__init__()
         self.order_book_id = make_order_book_id(data['InstrumentID'])
         self.buy_old_quantity = 0
@@ -95,9 +97,9 @@ class PositionDict(DataDict):
         self.buy_open_cost = 0.
         self.sell_open_cost = 0.
 
-        self.contract_multiplier = contract_multiplier
+        self.contract_multiplier = ins_dict.contract_multiplier if ins_dict is not None else 1
 
-        self.update_position(data)
+        self.update_data(data)
 
     def update_data(self, data):
         if data['PosiDirection'] in [defineDict["THOST_FTDC_PD_Net"], defineDict["THOST_FTDC_PD_Long"]]:
@@ -139,6 +141,17 @@ class AccountDict(DataDict):
 class InstrumentDict(DataDict):
     def __init__(self, data):
         super(InstrumentDict, self).__init__()
+        self.order_book_id = None
+        self.underlying_symbol = None
+        self.exchange_id = None
+        self.contract_multiplier = None
+        self.long_margin_ratio = None
+        self.short_margin_ratio = None
+        self.margin_type = None
+        self.instrument_id = None
+        self.update_data(data)
+
+    def update_data(self, data):
         if is_future(data['InstrumentID']):
             self.order_book_id = make_order_book_id(data['InstrumentID'])
             self.underlying_symbol = make_underlying_symbol(data['InstrumentID'])
@@ -199,7 +212,11 @@ class OrderDict(DataDict):
         self.update_data(data, rejected)
 
     def update_data(self, data, rejected=False):
-        self.order_id = int(data['OrderRef'])
+        print(data)
+        try:
+            self.order_id = int(data['OrderRef'])
+        except ValueError:
+            self.order_id = np.nan
         if 'InsertTime' in data:
             self.calendar_dt = parse(data['InsertTime'])
             self.trading_dt = make_trading_dt(self.calendar_dt)

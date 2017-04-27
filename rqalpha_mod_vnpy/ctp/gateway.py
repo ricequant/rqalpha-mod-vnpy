@@ -57,8 +57,9 @@ class CtpGateway(object):
 
     def connect_and_sync_data(self):
         self._connect()
+        self.on_log('同步数据中。')
 
-        if self._data_update_date == date.today():
+        if self._data_update_date != date.today():
             self._qry_instrument()
             self._qry_account()
             self._qry_position()
@@ -66,6 +67,7 @@ class CtpGateway(object):
             self._qry_commission()
             self._data_update_date = date.today()
         self._subscribe_all()
+        self.on_log('数据同步完成。')
 
     def init_md_api(self, md_address):
         self.md_api = CtpMdApi(self, self.temp_path, self.user_id, self.password, self.broker_id, md_address)
@@ -99,6 +101,9 @@ class CtpGateway(object):
             return self._cache.ins[order_book_id].instrument_id
         except KeyError:
             return None
+
+    def get_ins_dict(self, order_book_id):
+        return self._cache.ins.get(order_book_id)
 
     def get_tick(self):
         while True:
@@ -214,6 +219,7 @@ class CtpGateway(object):
             if req_id in self._query_returns[self.td_api.api_name]:
                 ins_cache = self._query_returns[self.td_api.api_name][req_id].copy()
                 del self._query_returns[self.td_api.api_name][req_id]
+                self.on_debug('%d 条合约数据返回。' % len(ins_cache))
                 return ins_cache
         else:
             raise RuntimeError('请求合约数据超时')
@@ -225,7 +231,9 @@ class CtpGateway(object):
             if req_id in self._query_returns[self.td_api.api_name]:
                 positions = self._query_returns[self.td_api.api_name][req_id].copy()
                 del self._query_returns[self.td_api.api_name][req_id]
+                self.on_debug('持仓数据返回: %s。' % str(positions.keys()))
                 return positions
+
         # 持仓数据有可能不返回
 
     def __qry_account(self):
@@ -235,6 +243,7 @@ class CtpGateway(object):
             if req_id in self._query_returns[self.td_api.api_name]:
                 account_dict = self._query_returns[self.td_api.api_name][req_id].copy()
                 del self._query_returns[self.td_api.api_name][req_id]
+                self.on_debug('账户数据返回: %s' % str(account_dict))
                 return account_dict
         else:
             raise RuntimeError('请求账户数据超时')

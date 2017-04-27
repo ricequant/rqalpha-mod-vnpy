@@ -48,7 +48,7 @@ class VNPYMod(AbstractMod):
         self._env.set_broker(VNPYBroker(self._gateway))
         self._env.set_event_source(VNPYEventSource(env, mod_config, self._gateway))
         self._env.set_data_source(VNPYDataSource(env, data_cache))
-        self._env.set_price_board(VNPYPriceBoard(self._data_factory))
+        self._env.set_price_board(VNPYPriceBoard(data_cache))
 
     def tear_down(self, code, exception=None):
         self._gateway.exit()

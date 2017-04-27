@@ -323,7 +323,7 @@ class CtpTdApi(TdApi):
 
         order_book_id = make_order_book_id(data['InstrumentID'])
         if order_book_id not in self.pos_cache:
-            self.pos_cache[order_book_id] = PositionDict(data, DataCache.contract_multiplier_cache[order_book_id])
+            self.pos_cache[order_book_id] = PositionDict(data, self.gateway.get_ins_dict(order_book_id))
         else:
             self.pos_cache[order_book_id].update_data(data)
 
