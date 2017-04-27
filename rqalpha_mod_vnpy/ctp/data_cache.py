@@ -44,7 +44,7 @@ class DataCache(object):
         self._order_cache = order_cache
 
     def cache_snapshot(self, tick_dict):
-        self._snapshot_cache[tick_dict.order_book_id] = tick
+        self._snapshot_cache[tick_dict.order_book_id] = tick_dict
 
     def cache_trade(self, trade_dict):
         if trade_dict.order_book_id not in self._trade_cache:

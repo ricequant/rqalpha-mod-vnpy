@@ -34,10 +34,9 @@ class DataDict(dict):
 class TickDict(DataDict):
     def __init__(self, data):
         super(TickDict, self).__init__()
-        
         self.order_book_id = make_order_book_id(data['InstrumentID'])
         self.date = int(data['TradingDay'])
-        self.time = int(''.join(data['UpdateTime'].replace(':', ''), data['UpdateMillisec']))
+        self.time = int(''.join((data['UpdateTime'].replace(':', ''), str(data['UpdateMillisec']))))
         self.open = data['OpenPrice']
         self.last = data['LastPrice']
         self.low = data['LowestPrice']
@@ -71,8 +70,6 @@ class TickDict(DataDict):
 
         self.limit_up = data['UpperLimitPrice']
         self.limit_down = data['LowerLimitPrice']
-
-        super(TickDict, self).__init__(tick_dict)
 
 
 class PositionDict(DataDict):
@@ -212,7 +209,8 @@ class OrderDict(DataDict):
         self.update_data(data, rejected)
 
     def update_data(self, data, rejected=False):
-        print(data)
+        if not data['InstrumentID']:
+            return
         try:
             self.order_id = int(data['OrderRef'])
         except ValueError:

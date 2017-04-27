@@ -306,7 +306,8 @@ class CtpTdApi(TdApi):
     def onRspQryOrder(self, data, last):
         """报单回报"""
         order_dict = OrderDict(data)
-        self.order_cache[order_dict.order_id] = order_dict
+        if order_dict.order_book_id is not None:
+            self.order_cache[order_dict.order_id] = order_dict
         if last:
             return self.order_cache
 
