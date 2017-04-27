@@ -139,7 +139,10 @@ class CtpMdApi(MdApi):
 
     def subscribe(self, order_book_id):
         """订阅合约"""
-        instrument_id = self.gateway.get_instrument_id(order_book_id)
+        ins_dict = self.gateway.get_ins_dict(order_book_id)
+        if ins_dict is None:
+            return None
+        instrument_id = ins_dict.instrument_id
         if instrument_id:
             self.subscribeMarketData(str(instrument_id))
 
@@ -757,11 +760,14 @@ class CtpTdApi(TdApi):
 
     def qryCommission(self, order_book_id):
         self.req_id += 1
+        ins_dict = self.gateway.get_ins_dict(order_book_id)
+        if ins_dict is None:
+            return None
         req = {
-            'InstrumentID': self.gateway.get_instrument_id(order_book_id),
+            'InstrumentID': ins_dict.instrument_id,
             'InvestorID': self.user_id,
             'BrokerID': self.broker_id,
-            'ExchangeID': self.gateway.get_exchange_id(order_book_id)
+            'ExchangeID': ins_dict.exchange_id,
         }
         self.reqQryInstrumentCommissionRate(req, self.req_id)
         return self.req_id
@@ -797,8 +803,12 @@ class CtpTdApi(TdApi):
     def sendOrder(self, order):
         """发单"""
 
+        ins_dict = self.gateway.get_ins_dict(order.order_book_id)
+        if ins_dict is None:
+            return None
+
         req = {
-            'InstrumentID': self.gateway.get_instrument_id(order.order_book_id),
+            'InstrumentID': ins_dict.instrument_id,
             'LimitPrice': order.price,
             'VolumeTotalOriginal': order.quantity,
             'OrderPriceType': ORDER_TYPE_MAPPING.get(order.type, ''),
@@ -825,10 +835,14 @@ class CtpTdApi(TdApi):
 
     def cancelOrder(self, order):
         """撤单"""
+        ins_dict = self.gateway.get_ins_dict(order.order_book_id)
+        if ins_dict is None:
+            return None
+
         self.req_id += 1
         req = {
-            'InstrumentID': self.gateway.get_instrument_id(order.order_book_id),
-            'ExchangeID': self.gateway.get_exchange_id(order.order_book_id),
+            'InstrumentID': ins_dict.instrument_id,
+            'ExchangeID': ins_dict.exchange_id,
             'OrderRef': str(order.order_id),
             'FrontID': int(self.front_id),
             'SessionID': int(self.session_id),
