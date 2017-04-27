@@ -325,7 +325,7 @@ class CtpTdApi(TdApi):
         if order_book_id not in self.pos_cache:
             self.pos_cache[order_book_id] = PositionDict(data, DataCache.contract_multiplier_cache[order_book_id])
         else:
-            self.pos_cache[order_book_id].update_position(data)
+            self.pos_cache[order_book_id].update_data(data)
 
         if last:
             return self.pos_cache
@@ -496,6 +496,8 @@ class CtpTdApi(TdApi):
     def onRtnOrder(self, data):
         """报单回报"""
         order_dict = OrderDict(data)
+        if order_dict.order_status is None:
+            return
         self.gateway.on_order(order_dict)
 
     def onRtnTrade(self, data):

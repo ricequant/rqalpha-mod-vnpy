@@ -17,6 +17,7 @@
 from dateutil.parser import parse
 from datetime import timedelta
 import numpy as np
+import re
 
 from rqalpha.model.order import Order, LimitOrder
 from rqalpha.model.trade import Trade
@@ -196,4 +197,8 @@ def make_tick(vnpy_tick):
     return tick
 
 
+def is_future(order_book_id):
+    if order_book_id is None:
+        return False
+    return re.match('^[a-zA-Z]+[0-9]+$', order_book_id) is not None
 

@@ -1,6 +1,7 @@
 from dateutil.parser import parse
 
 from rqalpha.const import SIDE, POSITION_EFFECT, ORDER_STATUS, COMMISSION_TYPE, MARGIN_TYPE
+from rqalpha.model.order import LimitOrder
 
 from ..utils import make_order_book_id, make_underlying_symbol, is_future, make_trading_dt
 from ..vnpy import *
@@ -98,7 +99,7 @@ class PositionDict(DataDict):
 
         self.update_position(data)
 
-    def update_position(self, data):
+    def update_data(self, data):
         if data['PosiDirection'] in [defineDict["THOST_FTDC_PD_Net"], defineDict["THOST_FTDC_PD_Long"]]:
             if data['YdPosition']:
                 self.buy_old_quantity = data['YdPosition']
@@ -179,7 +180,26 @@ class CommissionDict(DataDict):
 class OrderDict(DataDict):
     def __init__(self, data, rejected=False):
         super(OrderDict, self).__init__()
-        self.order_id = data['OrderRef']
+        self.order_id = None
+        self.calendar_dt = None
+        self.trading_dt = None
+        self.order_book_id = None
+        self.front_id = None
+        self.session_id = None
+        self.exchange_id = None
+
+        self.quantity = None
+        self.filled_quantity = None
+        self.unfilled_quantigy = None
+        self.side = None
+        self.price = None
+        self.position_effect = None
+        self.order_status = None
+
+        self.update_data(data, rejected)
+
+    def update_data(self, data, rejected=False):
+        self.order_id = int(data['OrderRef'])
         if 'InsertTime' in data:
             self.calendar_dt = parse(data['InsertTime'])
             self.trading_dt = make_trading_dt(self.calendar_dt)
@@ -228,7 +248,21 @@ class OrderDict(DataDict):
 class TradeDict(DataDict):
     def __init__(self, data):
         super(TradeDict, self).__init__()
-        self.order_id = data['OrderRef']
+        self.order_id = None
+        self.trade_id = None
+        self.calendar_dt = None
+        self.trading_dt = None
+        self.order_book_id = None
+
+        self.side = None
+        self.exchange_id = None
+        self.position_effect = None
+        self.amount = None
+        self.style = None
+        self.price = None
+
+    def update_data(self, data):
+        self.order_id = int(data['OrderRef'])
         self.trade_id = data['TradeID']
         self.calendar_dt = parse(data['TradeTime'])
         self.trading_dt = make_trading_dt(self.calendar_dt)
@@ -251,9 +285,9 @@ class TradeDict(DataDict):
             else:
                 self.position_effect = POSITION_EFFECT.CLOSE
 
-        self.quantity = data['Volume']
         self.amount = data['Volume']
         self.price = data['Price']
+        self.style = LimitOrder(self.price)
 
 
 class CallBackData(DataDict):

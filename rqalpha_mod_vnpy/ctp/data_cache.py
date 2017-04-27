@@ -6,7 +6,7 @@ from rqalpha.model.account.future_account import FutureAccount, margin_of
 from rqalpha.const import SIDE, POSITION_EFFECT
 
 
-class TdDataCache(object):
+class DataCache(object):
     def __init__(self):
         self._ins_cache = {}
         self._future_info_cache = {}
@@ -30,7 +30,7 @@ class TdDataCache(object):
             self._future_info_cache[underlying_symbol]['speculation'].update({
                 'open_commission_ratio': commission_dict.open_ratio,
                 'close_commission_ratio': commission_dict.close_ratio,
-                'close_commission_today_ratio': commission_dict.close_today_ratiom
+                'close_commission_today_ratio': commission_dict.close_today_ratiom,
                 'commission_type': commission_dict.commission_type,
             })
 
@@ -46,9 +46,18 @@ class TdDataCache(object):
     def cache_snapshot(self, tick_dict):
         self._snapshot_cache[tick_dict.order_book_id] = tick
 
+    def cache_trade(self, trade_dict):
+        if trade_dict.order_book_id not in self._trade_cache:
+            self._trade_cache = []
+        self._trade_cache.append(trade_dict)
+
     @property
     def ins(self):
         return self._ins_cache
+
+    @property
+    def future_info(self):
+        return self._future_info_cache
 
     @property
     def positions(self):
@@ -99,6 +108,10 @@ class TdDataCache(object):
             [margin_of(order_dict.order_book_id, order_dict.unfilled_quantity, order_dict.price) for order_dict in
              self._order_cache.values() if order_dict.order_status == ACTIVATE])
         return account
+
+    @property
+    def snapshot(self):
+        return self._snapshot_cache
 
 
 class RQObjectCache(object):
