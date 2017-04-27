@@ -3,14 +3,14 @@ import six
 from rqalpha.model.position import Positions
 from rqalpha.model.position.future_position import FuturePosition
 from rqalpha.model.account.future_account import FutureAccount, margin_of
-from rqalpha.const import SIDE, POSITION_EFFECT
+from rqalpha.const import SIDE, POSITION_EFFECT, ORDER_STATUS
 
 
 class DataCache(object):
     def __init__(self):
         self._ins_cache = {}
         self._future_info_cache = {}
-        self._account_dict = {}
+        self._account_dict = None
         self._pos_cache = {}
         self._trade_cache = {}
         self._order_cache = {}
@@ -62,7 +62,7 @@ class DataCache(object):
     @property
     def positions(self):
         ps = Positions(FuturePosition)
-        for order_book_id, pos_dict in self._positions:
+        for order_book_id, pos_dict in six.iteritems(self._pos_cache):
             position = FuturePosition(order_book_id)
 
             position._buy_old_holding_list = [(pos_dict.prev_settle_price, pos_dict.buy_old_quantity)]
@@ -71,24 +71,25 @@ class DataCache(object):
             position._buy_transaction_cost = pos_dict.buy_transaction_cost
             position._sell_transaction_cost = pos_dict.sell_transaction_cost
             position._buy_realized_pnl = pos_dict.buy_realized_pnl
-            position._sell_realized_pnl = pos_dic.sell_realized_pnl
+            position._sell_realized_pnl = pos_dict.sell_realized_pnl
 
             position._buy_avg_open_price = pos_dict.buy_avg_open_price
             position._sell_avg_open_price = pos_dict.sell_avg_open_price
 
-            trades = sorted(self._trade_cache[order_book_id], key=lambda t: t.trade_id, reverse=True)
+            if order_book_id in self._trade_cache:
+                trades = sorted(self._trade_cache[order_book_id], key=lambda t: t.trade_id, reverse=True)
 
-            buy_today_holding_list = []
-            sell_today_holding_list = []
+                buy_today_holding_list = []
+                sell_today_holding_list = []
 
-            for trade_dict in trades:
-                if trade_dict.side == SIDE.BUY and trade_dict.position_effect == POSITION_EFFECT.OPEN:
-                    buy_today_holding_list.append((trade_dict.price, trade_dict.quantity))
-                elif trade_dict.side == SIDE.SELL and trade_dict.position_effect == POSITION_EFFECT.OPEN:
-                    sell_today_holding_list.append((trade_dict.price, trade_dict.quantity))
+                for trade_dict in trades:
+                    if trade_dict.side == SIDE.BUY and trade_dict.position_effect == POSITION_EFFECT.OPEN:
+                        buy_today_holding_list.append((trade_dict.price, trade_dict.quantity))
+                    elif trade_dict.side == SIDE.SELL and trade_dict.position_effect == POSITION_EFFECT.OPEN:
+                        sell_today_holding_list.append((trade_dict.price, trade_dict.quantity))
 
-            position._buy_today_holding_list = buy_today_holding_list
-            position._sell_today_holding_list = sell_today_holding_list
+                position._buy_today_holding_list = buy_today_holding_list
+                position._sell_today_holding_list = sell_today_holding_list
 
             ps[order_book_id] = position
         return ps
@@ -103,10 +104,10 @@ class DataCache(object):
         margin = sum(position.margin for position in six.itervalues(ps))
         total_cash = static_value + holding_pnl + realized_pnl - cost - margin
 
-        account = FutureAccount(total_cash, positions)
+        account = FutureAccount(total_cash, ps)
         account._frozen_cash = sum(
             [margin_of(order_dict.order_book_id, order_dict.unfilled_quantity, order_dict.price) for order_dict in
-             self._order_cache.values() if order_dict.order_status == ACTIVATE])
+             self._order_cache.values() if order_dict.order_status == ORDER_STATUS.ACTIVE])
         return account
 
     @property

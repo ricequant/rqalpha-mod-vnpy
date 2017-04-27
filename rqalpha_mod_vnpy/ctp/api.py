@@ -18,7 +18,7 @@ from functools import wraps
 import os
 from rqalpha.const import ORDER_TYPE, SIDE, POSITION_EFFECT
 
-from .data_dict import TickDict, PositionDict, AccountDict, InstrumentDict, OrderDict, TradeDict, CallBackData, CommissionDict
+from .data_dict import TickDict, PositionDict, AccountDict, InstrumentDict, OrderDict, TradeDict, CommissionDict
 
 from ..vnpy import *
 from ..utils import make_order_book_id
@@ -244,7 +244,7 @@ class CtpTdApi(TdApi):
     def onRspOrderInsert(self, data, error, n, last):
         """发单错误（柜台）"""
         order_dict = OrderDict(data, rejected=True)
-        self.gateway.on_order(CallBackData(self.api_name, n, order_dict))
+        self.gateway.on_order(order_dict)
 
     def onRspParkedOrderInsert(self, data, error, n, last):
         """"""
@@ -504,14 +504,14 @@ class CtpTdApi(TdApi):
     def onRtnTrade(self, data):
         """成交回报"""
         trade_dict = TradeDict(data)
-        self.gateway.on_trade(CallBackData(self.api_name, n, trade_dict))
+        self.gateway.on_trade(trade_dict)
 
     def onErrRtnOrderInsert(self, data, error):
         """发单错误回报（交易所）"""
 
         self.gateway.on_err(error)
         order_dict = OrderDict(data, rejected=True)
-        self.gateway.on_order(CallBackData(self.api_name, n, order_dict))
+        self.gateway.on_order(order_dict)
 
     def onErrRtnOrderAction(self, data, error):
         """撤单错误回报（交易所）"""
@@ -755,12 +755,12 @@ class CtpTdApi(TdApi):
         self.reqQryInstrument({}, self.req_id)
         return self.req_id
 
-    def qyrCommission(self, order_book_id):
+    def qryCommission(self, order_book_id):
         self.req_id += 1
         req = {
             'InstrumentID': self.gateway.get_instrument_id(order_book_id),
-            'InvestorID': self.userID,
-            'BrokerID': self.brokerID,
+            'InvestorID': self.user_id,
+            'BrokerID': self.broker_id,
             'ExchangeID': self.gateway.get_exchange_id(order_book_id)
         }
         self.reqQryInstrumentCommissionRate(req, self.req_id)

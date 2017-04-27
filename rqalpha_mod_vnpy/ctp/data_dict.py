@@ -303,11 +303,3 @@ class TradeDict(DataDict):
         self.amount = data['Volume']
         self.price = data['Price']
         self.style = LimitOrder(self.price)
-
-
-class CallBackData(DataDict):
-    def __init__(self, api_name, req_id=None, data=None):
-        super(CallBackData, self).__init__()
-        self.api_name = api_name,
-        self.req_id = req_id,
-        self.data = data

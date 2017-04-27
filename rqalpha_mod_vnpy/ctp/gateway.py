@@ -21,12 +21,13 @@ from Queue import Queue, Empty
 from rqalpha.utils.logger import system_log
 from rqalpha.const import ACCOUNT_TYPE, ORDER_STATUS
 from rqalpha.environment import Environment
+from rqalpha.events import EVENT
+from rqalpha.events import Event as RqEvent
 from rqalpha.model.order import Order
 from rqalpha.model.trade import Trade
 from rqalpha.model.portfolio import Portfolio
 
 from .api import CtpTdApi, CtpMdApi
-from .data_cache import DataCache
 from ..utils import cal_commission
 
 
@@ -89,18 +90,6 @@ class CtpGateway(object):
         future_account = self._cache.account
         start_date = self._env.config.base.start_date
         return Portfolio(start_date, 1, future_account._total_cash, {ACCOUNT_TYPE.FUTURE: future_account})
-
-    def get_exchagne_id(self, order_book_id):
-        try:
-            return self._cache.ins[order_book_id].exchange_id
-        except KeyError:
-            return None
-
-    def get_instrument_id(self, order_book_id):
-        try:
-            return self._cache.ins[order_book_id].instrument_id
-        except KeyError:
-            return None
 
     def get_ins_dict(self, order_book_id):
         return self._cache.ins.get(order_book_id)
@@ -291,8 +280,9 @@ class CtpGateway(object):
 
     def _qry_commission(self):
         for order_book_id, ins_dict in iteritems(self._cache.ins):
-            if ins_dict.underlying_symbol in self._cache.future_info:
+            if ins_dict.underlying_symbol in self._cache.future_info and 'commission_type' in self._cache.future_info[ins_dict.underlying_symbol]['speculation']:
                 continue
+            print('commission', order_book_id)
             self.__qry_commission(order_book_id)
 
     def _subscribe_all(self):
