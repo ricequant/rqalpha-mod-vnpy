@@ -112,7 +112,8 @@ class CtpMdApi(MdApi):
     def onRtnDepthMarketData(self, data):
         """行情推送"""
         tick_dict = TickDict(data)
-        self.gateway.on_tick(tick_dict)
+        if tick_dict.is_valid:
+            self.gateway.on_tick(tick_dict)
 
     def onRspSubForQuoteRsp(self, data, error, n, last):
         """订阅期权询价"""
@@ -247,7 +248,8 @@ class CtpTdApi(TdApi):
     def onRspOrderInsert(self, data, error, n, last):
         """发单错误（柜台）"""
         order_dict = OrderDict(data, rejected=True)
-        self.gateway.on_order(order_dict)
+        if order_dict.is_valid:
+            self.gateway.on_order(order_dict)
 
     def onRspParkedOrderInsert(self, data, error, n, last):
         """"""
@@ -309,7 +311,7 @@ class CtpTdApi(TdApi):
     def onRspQryOrder(self, data, last):
         """报单回报"""
         order_dict = OrderDict(data)
-        if order_dict.order_book_id is not None:
+        if order_dict.is_valid:
             self.order_cache[order_dict.order_id] = order_dict
         if last:
             return self.order_cache
@@ -366,7 +368,7 @@ class CtpTdApi(TdApi):
     def onRspQryInstrument(self, data, last):
         """合约查询回报"""
         ins_dict = InstrumentDict(data)
-        if ins_dict.order_book_id:
+        if ins_dict.is_valid:
             self.ins_cache[ins_dict.order_book_id] = ins_dict
         if last:
             return self.ins_cache
@@ -494,9 +496,8 @@ class CtpTdApi(TdApi):
     def onRtnOrder(self, data):
         """报单回报"""
         order_dict = OrderDict(data)
-        if order_dict.order_status is None:
-            return
-        self.gateway.on_order(order_dict)
+        if order_dict.is_valid:
+            self.gateway.on_order(order_dict)
 
     def onRtnTrade(self, data):
         """成交回报"""
@@ -508,7 +509,8 @@ class CtpTdApi(TdApi):
 
         self.gateway.on_err(error)
         order_dict = OrderDict(data, rejected=True)
-        self.gateway.on_order(order_dict)
+        if order_dict.is_valid:
+            self.gateway.on_order(order_dict)
 
     def onErrRtnOrderAction(self, data, error):
         """撤单错误回报（交易所）"""

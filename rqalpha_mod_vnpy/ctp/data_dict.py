@@ -34,42 +34,91 @@ class DataDict(dict):
 class TickDict(DataDict):
     def __init__(self, data):
         super(TickDict, self).__init__()
+        self.order_book_id = None
+        self.date = None
+        self.time = None
+        self.open = None
+        self.last = None
+        self.low = None
+        self.high = None
+        self.prev_close = None
+        self.volume = None
+        self.total_turnover = None
+        self.open_interest = None
+        self.prev_settlement = None
+
+        self.b1 = None
+        self.b2 = None
+        self.b3 = None
+        self.b4 = None
+        self.b5 = None
+
+        self.b1_v = None
+        self.b2_v = None
+        self.b3_v = None
+        self.b4_v = None
+        self.b5_v = None
+
+        self.a1 = None
+        self.a2 = None
+        self.a3 = None
+        self.a4 = None
+        self.a5 = None
+
+        self.a1_v = None
+        self.a2_v = None
+        self.a3_v = None
+        self.a4_v = None
+        self.a5_v = None
+
+        self.limit_down = None
+        self.limit_up = None
+
+        self.is_valid = False
+
+        self.update_data(data)
+
+    def update_data(self, data):
         self.order_book_id = make_order_book_id(data['InstrumentID'])
-        self.date = int(data['TradingDay'])
-        self.time = int(''.join((data['UpdateTime'].replace(':', ''), str(data['UpdateMillisec']))))
-        self.open = data['OpenPrice']
-        self.last = data['LastPrice']
-        self.low = data['LowestPrice']
-        self.high = data['HighestPrice']
-        self.prev_close = data['PreClosePrice']
-        self.volume = data['Volume']
-        self.total_turnover = data['Turnover']
-        self.open_interest = data['OpenInterest']
-        self.prev_settlement = data['SettlementPrice']
+        try:
+            self.date = int(data['TradingDay'])
+            self.time = int(''.join((data['UpdateTime'].replace(':', ''), str(data['UpdateMillisec']))))
+            self.open = data['OpenPrice']
+            self.last = data['LastPrice']
+            self.low = data['LowestPrice']
+            self.high = data['HighestPrice']
+            self.prev_close = data['PreClosePrice']
+            self.volume = data['Volume']
+            self.total_turnover = data['Turnover']
+            self.open_interest = data['OpenInterest']
+            self.prev_settlement = data['SettlementPrice']
 
-        self.b1 = data['BidPrice1']
-        self.b2 = data['BidPrice2']
-        self.b3 = data['BidPrice3']
-        self.b4 = data['BidPrice4']
-        self.b5 = data['BidPrice5']
-        self.b1_v = data['BidVolume1']
-        self.b2_v = data['BidVolume2']
-        self.b3_v = data['BidVolume3']
-        self.b4_v = data['BidVolume4']
-        self.b5_v = data['BidVolume5']
-        self.a1 = data['AskPrice1']
-        self.a2 = data['AskPrice2']
-        self.a3 = data['AskPrice3']
-        self.a4 = data['AskPrice4']
-        self.a5 = data['AskPrice5']
-        self.a1_v = data['AskVolume1']
-        self.a2_v = data['AskVolume2']
-        self.a3_v = data['AskVolume3']
-        self.a4_v = data['AskVolume4']
-        self.a5_v = data['AskVolume5']
+            self.b1 = data['BidPrice1']
+            self.b2 = data['BidPrice2']
+            self.b3 = data['BidPrice3']
+            self.b4 = data['BidPrice4']
+            self.b5 = data['BidPrice5']
+            self.b1_v = data['BidVolume1']
+            self.b2_v = data['BidVolume2']
+            self.b3_v = data['BidVolume3']
+            self.b4_v = data['BidVolume4']
+            self.b5_v = data['BidVolume5']
+            self.a1 = data['AskPrice1']
+            self.a2 = data['AskPrice2']
+            self.a3 = data['AskPrice3']
+            self.a4 = data['AskPrice4']
+            self.a5 = data['AskPrice5']
+            self.a1_v = data['AskVolume1']
+            self.a2_v = data['AskVolume2']
+            self.a3_v = data['AskVolume3']
+            self.a4_v = data['AskVolume4']
+            self.a5_v = data['AskVolume5']
 
-        self.limit_up = data['UpperLimitPrice']
-        self.limit_down = data['LowerLimitPrice']
+            self.limit_up = data['UpperLimitPrice']
+            self.limit_down = data['LowerLimitPrice']
+            self.is_valid = True
+        except ValueError:
+            self.is_valid = False
 
 
 class PositionDict(DataDict):
@@ -95,6 +144,8 @@ class PositionDict(DataDict):
         self.sell_open_cost = 0.
 
         self.contract_multiplier = ins_dict.contract_multiplier if ins_dict is not None else 1
+
+        self.is_valid = False
 
         self.update_data(data)
 
@@ -128,6 +179,8 @@ class PositionDict(DataDict):
         if data['PreSettlementPrice']:
             self.prev_settle_price = data['PreSettlementPrice']
 
+        self.is_valid = True
+
 
 class AccountDict(DataDict):
     def __init__(self, data):
@@ -146,6 +199,9 @@ class InstrumentDict(DataDict):
         self.short_margin_ratio = None
         self.margin_type = None
         self.instrument_id = None
+
+        self.is_valid = False
+
         self.update_data(data)
 
     def update_data(self, data):
@@ -158,16 +214,24 @@ class InstrumentDict(DataDict):
             self.short_margin_ratio = data['ShortMarginRatio']
             self.margin_type = MARGIN_TYPE.BY_MONEY
             self.instrument_id = data['InstrumentID']
+            self.is_valid = True
         else:
-            self.order_book_id = None
-
-    def __nonzero__(self):
-        return self.order_book_id is not None
+            self.is_valid = False
 
 
 class CommissionDict(DataDict):
     def __init__(self, data):
         super(CommissionDict, self).__init__()
+        self.underlying_symbol = None
+        self.close_ratio = None
+        self.open_ratio = None
+        self.close_today_ratio = None
+        self.commission_type = None
+
+        self.is_valid = False
+        self.update_data(data)
+
+    def update_data(self, data):
         self.underlying_symbol = make_underlying_symbol(data['InstrumentID'])
         if data['OpenRatioByMoney'] == 0 and data['CloseRatioByMoney']:
             self.open_ratio = data['OpenRatioByVolume']
@@ -185,6 +249,7 @@ class CommissionDict(DataDict):
                 self.commission_type = COMMISSION_TYPE.BY_MONEY
             else:
                 self.commission_type = None
+        self.is_valid = True
 
 
 class OrderDict(DataDict):
@@ -205,6 +270,8 @@ class OrderDict(DataDict):
         self.price = None
         self.position_effect = None
         self.order_status = None
+
+        self.is_valid = False
 
         self.update_data(data, rejected)
 
@@ -258,6 +325,7 @@ class OrderDict(DataDict):
                     self.order_status = ORDER_STATUS.FILLED
                 elif data['OrderStatus'] == defineDict["THOST_FTDC_OST_Canceled"]:
                     self.order_status = ORDER_STATUS.CANCELLED
+        self.is_valid = True
 
 
 class TradeDict(DataDict):
@@ -275,6 +343,8 @@ class TradeDict(DataDict):
         self.amount = None
         self.style = None
         self.price = None
+
+        self.is_valid = False
 
     def update_data(self, data):
         self.order_id = int(data['OrderRef'])
@@ -303,3 +373,5 @@ class TradeDict(DataDict):
         self.amount = data['Volume']
         self.price = data['Price']
         self.style = LimitOrder(self.price)
+
+        self.is_valid = True

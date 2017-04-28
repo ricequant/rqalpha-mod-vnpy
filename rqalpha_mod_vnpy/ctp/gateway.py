@@ -65,7 +65,7 @@ class CtpGateway(object):
             self._qry_account()
             self._qry_position()
             self._qry_order()
-            self._qry_commission()
+            # self._qry_commission()
             self._data_update_date = date.today()
         self._subscribe_all()
         self.on_log('数据同步完成。')
@@ -282,7 +282,6 @@ class CtpGateway(object):
         for order_book_id, ins_dict in iteritems(self._cache.ins):
             if ins_dict.underlying_symbol in self._cache.future_info and 'commission_type' in self._cache.future_info[ins_dict.underlying_symbol]['speculation']:
                 continue
-            print('commission', order_book_id)
             commission_dict = self.__qry_commission(order_book_id)
             self._cache.cache_commission(ins_dict.underlying_symbol, commission_dict)
 
