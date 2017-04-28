@@ -322,14 +322,12 @@ class CtpTdApi(TdApi):
     def onRspQryInvestorPosition(self, data, last):
         """持仓查询回报"""
 
-        if not data['InstrumentID']:
-            return
-
-        order_book_id = make_order_book_id(data['InstrumentID'])
-        if order_book_id not in self.pos_cache:
-            self.pos_cache[order_book_id] = PositionDict(data, self.gateway.get_ins_dict(order_book_id))
-        else:
-            self.pos_cache[order_book_id].update_data(data)
+        if data['InstrumentID']:
+            order_book_id = make_order_book_id(data['InstrumentID'])
+            if order_book_id not in self.pos_cache:
+                self.pos_cache[order_book_id] = PositionDict(data, self.gateway.get_ins_dict(order_book_id))
+            else:
+                self.pos_cache[order_book_id].update_data(data)
 
         if last:
             return self.pos_cache
@@ -367,15 +365,11 @@ class CtpTdApi(TdApi):
     @query_in_sync
     def onRspQryInstrument(self, data, last):
         """合约查询回报"""
-        if not data['InstrumentID']:
-            return
-
         ins_dict = InstrumentDict(data)
-        self.ins_cache[ins_dict.order_book_id] = ins_dict
-
+        if ins_dict.order_book_id:
+            self.ins_cache[ins_dict.order_book_id] = ins_dict
         if last:
             return self.ins_cache
-
 
     def onRspQryDepthMarketData(self, data, error, n, last):
         """"""
