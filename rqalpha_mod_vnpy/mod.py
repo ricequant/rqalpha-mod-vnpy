@@ -15,10 +15,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from time import sleep
+import os
 from rqalpha.interface import AbstractMod
 
-vn_trader_path = None
+vn_ctp_path = None
 
 
 class VNPYMod(AbstractMod):
@@ -27,8 +27,9 @@ class VNPYMod(AbstractMod):
         self._gateway = None
 
     def start_up(self, env, mod_config):
-        global vn_trader_path
-        vn_trader_path = mod_config.vn_trader_path
+        global vn_ctp_path
+
+        vn_ctp_path = os.path.join(mod_config.vn_trader_path, 'gateway/ctpGateway')
         from .vnpy_event_source import VNPYEventSource
         from .vnpy_broker import VNPYBroker
         from .vnpy_data_source import VNPYDataSource

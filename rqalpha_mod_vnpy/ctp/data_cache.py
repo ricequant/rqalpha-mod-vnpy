@@ -25,14 +25,13 @@ class DataCache(object):
                 'margin_type': ins_dict.margin_type,
             }} for ins_dict in self._ins_cache.values()}
 
-    def cache_commission(self, commission_cache):
-        for underlying_symbol, commission_dict in six.iteritems(commission_cache):
-            self._future_info_cache[underlying_symbol]['speculation'].update({
-                'open_commission_ratio': commission_dict.open_ratio,
-                'close_commission_ratio': commission_dict.close_ratio,
-                'close_commission_today_ratio': commission_dict.close_today_ratiom,
-                'commission_type': commission_dict.commission_type,
-            })
+    def cache_commission(self, underlying_symbol, commission_dict):
+        self._future_info_cache[underlying_symbol]['speculation'].update({
+            'open_commission_ratio': commission_dict.open_ratio,
+            'close_commission_ratio': commission_dict.close_ratio,
+            'close_commission_today_ratio': commission_dict.close_today_ratio,
+            'commission_type': commission_dict.commission_type,
+        })
 
     def cache_position(self, pos_cache):
         self._pos_cache = pos_cache

@@ -283,7 +283,8 @@ class CtpGateway(object):
             if ins_dict.underlying_symbol in self._cache.future_info and 'commission_type' in self._cache.future_info[ins_dict.underlying_symbol]['speculation']:
                 continue
             print('commission', order_book_id)
-            self.__qry_commission(order_book_id)
+            commission_dict = self.__qry_commission(order_book_id)
+            self._cache.cache_commission(ins_dict.underlying_symbol, commission_dict)
 
     def _subscribe_all(self):
         for order_book_id in self._cache.ins.keys():
