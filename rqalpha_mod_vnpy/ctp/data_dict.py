@@ -161,7 +161,7 @@ class PositionDict(DataDict):
             self.buy_realized_pnl += data['CloseProfit']
 
             self.buy_open_cost += data['OpenCost']
-            self.buy_avg_open_price = self.buy_open_cost / (self.buy_quantity * self.contract_multiplier)
+            self.buy_avg_open_price = self.buy_open_cost / (self.buy_quantity * self.contract_multiplier) if self.buy_quantity > 0 else 0
 
         elif data['PosiDirection'] == defineDict["THOST_FTDC_PD_Short"]:
             if data['YdPosition']:
@@ -174,7 +174,7 @@ class PositionDict(DataDict):
             self.sell_realized_pnl += data['CloseProfit']
 
             self.sell_open_cost += data['OpenCost']
-            self.sell_avg_open_price = self.sell_open_cost / (self.sell_quantity * self.contract_multiplier)
+            self.sell_avg_open_price = self.sell_open_cost / (self.sell_quantity * self.contract_multiplier) if self.sell_quantity > 0 else 0
 
         if data['PreSettlementPrice']:
             self.prev_settle_price = data['PreSettlementPrice']

@@ -87,6 +87,8 @@ class CtpGateway(object):
         self.order_objects[order.order_id] = order
 
     def cancel_order(self, order):
+        account = Environment.get_instance().get_account(order.order_book_id)
+        self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_PENDING_CANCEL, account=account, order=order))
         self.td_api.cancelOrder(order)
 
     def get_portfolio(self):

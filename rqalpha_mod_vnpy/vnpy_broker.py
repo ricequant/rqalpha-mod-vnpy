@@ -59,8 +59,6 @@ class VNPYBroker(AbstractBroker):
         self._gateway.submit_order(order)
 
     def cancel_order(self, order):
-        account = Environment.get_instance().get_account(order.order_book_id)
-        self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_PENDING_CANCEL, account=account, order=order))
         self._gateway.cancel_order(order)
 
     def update(self, calendar_dt, trading_dt, bar_dict):
