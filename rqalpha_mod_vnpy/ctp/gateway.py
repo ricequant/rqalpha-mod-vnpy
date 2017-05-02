@@ -79,8 +79,11 @@ class CtpGateway(object):
         self._query_returns[self.td_api.api_name] = {}
 
     def submit_order(self, order):
+        account = Environment.get_instance().get_account(order.order_book_id)
+        self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_PENDING_NEW, account=account, order=order))
+        if order.is_final():
+            return
         self.td_api.sendOrder(order)
-        self.open_orders[order.order_id] = order
         self.order_objects[order.order_id] = order
 
     def cancel_order(self, order):

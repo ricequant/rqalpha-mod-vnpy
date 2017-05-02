@@ -163,7 +163,7 @@ class PositionDict(DataDict):
             self.buy_open_cost += data['OpenCost']
             self.buy_avg_open_price = self.buy_open_cost / (self.buy_quantity * self.contract_multiplier)
 
-        elif data['PosiDirection'] == dfineDict["THOST_FTDC_PD_Short"]:
+        elif data['PosiDirection'] == defineDict["THOST_FTDC_PD_Short"]:
             if data['YdPosition']:
                 self.sell_old_quantity = data['YdPosition']
             if data['TodayPosition']:
@@ -265,7 +265,7 @@ class OrderDict(DataDict):
 
         self.quantity = None
         self.filled_quantity = None
-        self.unfilled_quantigy = None
+        self.unfilled_quantity = None
         self.side = None
         self.price = None
         self.position_effect = None
@@ -296,7 +296,7 @@ class OrderDict(DataDict):
 
         if 'VolumeTraded' in data:
             self.filled_quantity = data['VolumeTraded']
-            self.unfilled_quantigy = self.quantity - self.unfilled_quantigy
+            self.unfilled_quantity = self.quantity - self.filled_quantity
 
         self.side = SIDE_REVERSE.get(data['Direction'], SIDE.BUY)
         self.price = data['LimitPrice']

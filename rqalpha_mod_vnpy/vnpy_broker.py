@@ -16,6 +16,7 @@
 # limitations under the License.
 
 from rqalpha.interface import AbstractBroker
+from rqalpha.environment import Environment
 from rqalpha.model.account import BenchmarkAccount, FutureAccount
 from rqalpha.const import ACCOUNT_TYPE
 
@@ -55,10 +56,6 @@ class VNPYBroker(AbstractBroker):
             return self._gateway.open_orders
 
     def submit_order(self, order):
-        account = Environment.get_instance().get_account(order.order_book_id)
-        self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_PENDING_NEW, account=account, order=order))
-        if order.is_final():
-            return
         self._gateway.submit_order(order)
 
     def cancel_order(self, order):
