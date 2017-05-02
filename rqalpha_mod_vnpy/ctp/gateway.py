@@ -79,12 +79,8 @@ class CtpGateway(object):
         self._query_returns[self.td_api.api_name] = {}
 
     def submit_order(self, order):
-        account = Environment.get_instance().get_account(order.order_book_id)
-        self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_PENDING_NEW, account=account, order=order))
-        if order.is_final():
-            return
         self.td_api.sendOrder(order)
-        self.order_objects[order.order_id] = order
+        self._cache.cache_order(order)
 
     def cancel_order(self, order):
         account = Environment.get_instance().get_account(order.order_book_id)
@@ -126,43 +122,50 @@ class CtpGateway(object):
         system_log.error('CTP 错误，错误代码：%s，错误信息：%s' % (str(error['ErrorID']), error['ErrorMsg']))
 
     def on_order(self, order_dict):
+        self.on_debug('订单回报: %s' % str(order_dict))
         if self._data_update_date != date.today():
             return
-        try:
-            order = self.order_objects[order_dict.order_id]
-        except KeyError:
-            order = Order.__from_create__(order_dict.calendar_dt, order_dict.trading_dt, order_dict.order_book_id,
-                                          order_dict.quantity, order_dict.side, order_dict.style,
-                                          order_dict.position_effect)
-        account = Environment.get_instance().get_account(order.order_book_id)
-        order.active()
-        self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_CREATION_PASS, account=account, order=order))
 
-        if order_dict.order_status == ORDER_STATUS.ACTIVE:
-            if order not in self.open_orders:
-                self.open_orders.append(order)
-        elif order_dict.order_status == ORDER_STATUS.FILLED:
-            if order in self.open_orders:
-                self.open_orders.remove(order)
-        elif order_dict.order_status == ORDER_STATUS.CANCELLED:
-            if order in self.open_orders:
-                self.open_orders.remove(order)
-            if order.status == ORDER_STATUS.PENDING_CANCEL:
-                order.mark_cancelled("%d order has been cancelled by user." % order.order_id)
-                self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_CANCELLATION_PASS, account=account, order=order))
-            else:
-                order.mark_rejected('Order was rejected or cancelled by vnpy.')
+        order = self._cache.get_cached_order(order_dict)
+
+        account = Environment.get_instance().get_account(order.order_book_id)
+
+        if order.status == ORDER_STATUS.PENDING_NEW:
+            self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_PENDING_NEW, account=account, order=order))
+            order.active()
+            self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_CREATION_PASS, account=account, order=order))
+            if order_dict.status == ORDER_STATUS.ACTIVE:
+                if order not in self.open_orders:
+                    self.open_orders.append(order)
+            elif order_dict.status in [ORDER_STATUS.CANCELLED, ORDER_STATUS.REJECTED]:
+                order.mark_rejected('Order was rejected or cancelled.')
                 self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_UNSOLICITED_UPDATE, account=account, order=order))
-        elif order_dict.order_status == ORDER_STATUS.REJECTED:
-            if order in self.open_orders:
-                self.open_orders.remove(order)
-            order.mark_rejected('Order was rejected or cancelled by vnpy.')
-            self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_UNSOLICITED_UPDATE, account=account, order=order))
+            elif order_dict.status == ORDER_STATUS.FILLED:
+                order.status = order_dict.status
+
+        elif order.status == ORDER_STATUS.ACTIVE:
+            if order_dict.status == ORDER_STATUS.FILLED:
+                order.status = order_dict.status
+            if order_dict.status == ORDER_STATUS.CANCELLED:
+                order.mark_cancelled("%d order has been cancelled." % order.order_id)
+                self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_CANCELLATION_PASS, account=account, order=order))
+
+        elif order.status == ORDER_STATUS.PENDING_CANCEL:
+            if order_dict.status == ORDER_STATUS.CANCELLED:
+                order.mark_cancelled("%d order has been cancelled." % order.order_id)
+                self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_CANCELLATION_PASS, account=account, order=order))
+            if order_dict.status == ORDER_STATUS.FILLED:
+                order.status = order_dict.status
 
     def on_trade(self, trade_dict):
         if self._data_update_date != date.today():
             self._cache.cache_trade(trade_dict)
         else:
+            account = Environment.get_instance().get_account(trade_dict.order_book_id)
+
+            if trade_dict.trade_id in account._backward_trade_set:
+                return
+
             try:
                 order = self.order_objects[trade_dict.order_id]
             except KeyError:
@@ -173,10 +176,10 @@ class CtpGateway(object):
                                         trade_dict.amount)
             trade = Trade.__from_create__(
                 trade_dict.order_id, trade_dict.calendar_dt, trade_dict.trading_dt, trade_dict.price, trade_dict.amount,
-                trade_dict.side, trade_dict.position_effect, trade_dict.order_book_id,
+                trade_dict.side, trade_dict.position_effect, trade_dict.order_book_id, trade_id=trade_dict.trade_id,
                 commission=commission, frozen_price=trade_dict.price)
+
             order.fill(trade)
-            account = Environment.get_instance().get_account(order.order_book_id)
             self._env.event_bus.publish_event(RqEvent(EVENT.TRADE, account=account, trade=trade))
 
     def on_tick(self, tick_dict):
@@ -281,7 +284,7 @@ class CtpGateway(object):
 
     def _qry_order(self):
         order_cache = self.__qry_order()
-        self._cache.cache_order(order_cache)
+        self._cache.cache_qry_order(order_cache)
 
     def _qry_commission(self):
         for order_book_id, ins_dict in iteritems(self._cache.ins):

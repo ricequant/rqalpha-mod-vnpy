@@ -13,9 +13,11 @@ class DataCache(object):
         self._account_dict = None
         self._pos_cache = {}
         self._trade_cache = {}
-        self._order_cache = {}
+        self._qry_order_cache = {}
 
         self._snapshot_cache = {}
+
+        self._order_cache = {}
 
     def cache_ins(self, ins_cache):
         self._ins_cache = ins_cache
@@ -39,8 +41,8 @@ class DataCache(object):
     def cache_account(self, account_dict):
         self._account_dict = account_dict
 
-    def cache_order(self, order_cache):
-        self._order_cache = order_cache
+    def cache_qry_order(self, order_cache):
+        self._qry_order_cache = order_cache
 
     def cache_snapshot(self, tick_dict):
         self._snapshot_cache[tick_dict.order_book_id] = tick_dict
@@ -49,6 +51,19 @@ class DataCache(object):
         if trade_dict.order_book_id not in self._trade_cache:
             self._trade_cache = []
         self._trade_cache.append(trade_dict)
+
+    def get_cached_order(self, order_dict):
+        try:
+            order = self.order_objects[order_dict.order_id]
+        except KeyError:
+            order = Order.__from_create__(order_dict.calendar_dt, order_dict.trading_dt, order_dict.order_book_id,
+                                          order_dict.quantity, order_dict.side, order_dict.style,
+                                          order_dict.position_effect)
+            self.cache_order(order)
+        return order
+
+    def cache_order(self, order):
+        self._order_cache[order.order_id] = order
 
     @property
     def ins(self):
@@ -106,7 +121,7 @@ class DataCache(object):
         account = FutureAccount(total_cash, ps)
         account._frozen_cash = sum(
             [margin_of(order_dict.order_book_id, order_dict.unfilled_quantity, order_dict.price) for order_dict in
-             self._order_cache.values() if order_dict.order_status == ORDER_STATUS.ACTIVE])
+             self._qry_order_cache.values() if order_dict.status == ORDER_STATUS.ACTIVE])
         return account
 
     @property

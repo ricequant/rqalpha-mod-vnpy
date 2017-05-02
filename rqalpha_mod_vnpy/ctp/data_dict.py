@@ -269,7 +269,7 @@ class OrderDict(DataDict):
         self.side = None
         self.price = None
         self.position_effect = None
-        self.order_status = None
+        self.status = None
 
         self.is_valid = False
 
@@ -316,15 +316,15 @@ class OrderDict(DataDict):
                 self.position_effect = POSITION_EFFECT.CLOSE
 
         if rejected:
-            self.order_status = ORDER_STATUS.REJECTED
+            self.status = ORDER_STATUS.REJECTED
         else:
             if 'OrderStatus' in data:
                 if data['OrderStatus'] in [defineDict["THOST_FTDC_OST_PartTradedQueueing"], defineDict["THOST_FTDC_OST_NoTradeQueueing"]]:
-                    self.order_status = ORDER_STATUS.ACTIVE
+                    self.status = ORDER_STATUS.ACTIVE
                 elif data['OrderStatus'] == defineDict["THOST_FTDC_OST_AllTraded"]:
-                    self.order_status = ORDER_STATUS.FILLED
+                    self.status = ORDER_STATUS.FILLED
                 elif data['OrderStatus'] == defineDict["THOST_FTDC_OST_Canceled"]:
-                    self.order_status = ORDER_STATUS.CANCELLED
+                    self.status = ORDER_STATUS.CANCELLED
         self.is_valid = True
 
 
