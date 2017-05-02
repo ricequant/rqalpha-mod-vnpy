@@ -65,7 +65,7 @@ class CtpGateway(object):
             self._qry_account()
             self._qry_position()
             self._qry_order()
-            # self._qry_commission()
+            self._qry_commission()
             self._data_update_date = date.today()
         self._subscribe_all()
         self.on_log('数据同步完成。')
