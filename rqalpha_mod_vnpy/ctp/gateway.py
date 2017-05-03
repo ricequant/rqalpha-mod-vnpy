@@ -252,7 +252,6 @@ class CtpGateway(object):
             if req_id in self._query_returns[self.td_api.api_name]:
                 commission_dict = self._query_returns[self.td_api.api_name][req_id].copy()
                 del self._query_returns[self.td_api.api_name][req_id]
-                self.on_debug('费率数据返回')
                 return commission_dict
         # commission 数据有可能不返回
 
@@ -294,6 +293,7 @@ class CtpGateway(object):
                 continue
             commission_dict = self.__qry_commission(order_book_id)
             self._cache.cache_commission(ins_dict.underlying_symbol, commission_dict)
+        self.on_debug('费率数据返回')
 
     def _subscribe_all(self):
         for order_book_id in self._cache.ins.keys():
