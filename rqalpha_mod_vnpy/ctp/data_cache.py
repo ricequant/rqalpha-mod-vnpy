@@ -54,7 +54,7 @@ class DataCache(object):
 
     def get_cached_order(self, order_dict):
         try:
-            order = self.order_objects[order_dict.order_id]
+            order = self._order_cache[order_dict.order_id]
         except KeyError:
             order = Order.__from_create__(order_dict.calendar_dt, order_dict.trading_dt, order_dict.order_book_id,
                                           order_dict.quantity, order_dict.side, order_dict.style,
