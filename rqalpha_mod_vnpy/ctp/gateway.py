@@ -252,6 +252,7 @@ class CtpGateway(object):
             if req_id in self._query_returns[self.td_api.api_name]:
                 commission_dict = self._query_returns[self.td_api.api_name][req_id].copy()
                 del self._query_returns[self.td_api.api_name][req_id]
+                self.on_debug('费率数据返回')
                 return commission_dict
         # commission 数据有可能不返回
 
@@ -262,6 +263,7 @@ class CtpGateway(object):
             if req_id in self._query_returns[self.td_api.api_name]:
                 order_dict = self._query_returns[self.td_api.api_name][req_id].copy()
                 del self._query_returns[self.td_api.api_name][req_id]
+                self.on_debug('订单数据返回')
                 return order_dict
         # order 数据有可能不返回
 
