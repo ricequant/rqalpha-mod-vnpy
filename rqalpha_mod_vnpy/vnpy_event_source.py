@@ -24,7 +24,6 @@ from rqalpha.utils.logger import system_log
 from rqalpha.interface import AbstractEventSource
 from rqalpha.events import Event, EVENT
 from rqalpha.utils import RqAttrDict
-from rqalpha.model.tick import Tick
 
 
 class TimePeriod(Enum):
@@ -129,6 +128,7 @@ class VNPYEventSource(AbstractEventSource):
                     continue
                 else:
                     tick = self._gateway.get_tick()
+                    print(' '.join((str(tick.date), str(tick.time/1000))))
                     calendar_dt = parse(''.join((str(tick.date), str(tick.time/1000))))
                     if calendar_dt.hour > 20:
                         trading_dt = calendar_dt + timedelta(days=1)

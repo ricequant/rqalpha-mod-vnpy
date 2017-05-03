@@ -82,7 +82,8 @@ class TickDict(DataDict):
         self.order_book_id = make_order_book_id(data['InstrumentID'])
         try:
             self.date = int(data['TradingDay'])
-            self.time = int(''.join((data['UpdateTime'].replace(':', ''), str(data['UpdateMillisec']))))
+            self.time = int((data['UpdateTime'].replace(':', ''))) * 1000 + int(data['UpdateMillisec'])
+            # self.time = int(''.join((data['UpdateTime'].replace(':', ''), str(data['UpdateMillisec']))))
             self.open = data['OpenPrice']
             self.last = data['LastPrice']
             self.low = data['LowestPrice']

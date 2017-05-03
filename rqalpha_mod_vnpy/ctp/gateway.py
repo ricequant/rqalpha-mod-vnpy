@@ -70,6 +70,8 @@ class CtpGateway(object):
         self._subscribe_all()
         self.on_log('数据同步完成。')
 
+        self._env.event_bus.add_listener(EVENT.POST_UNIVERSE_CHANGED, self.on_universe_changed)
+
     def init_md_api(self, md_address):
         self.md_api = CtpMdApi(self, self.temp_path, self.user_id, self.password, self.broker_id, md_address)
         self._query_returns[self.md_api.api_name] = {}
@@ -119,7 +121,7 @@ class CtpGateway(object):
         system_log.info(log)
 
     def on_err(self, error):
-        system_log.error('CTP 错误，错误代码：%s，错误信息：%s' % (str(error['ErrorID']), error['ErrorMsg']))
+        system_log.error('CTP 错误，错误代码：%s，错误信息：%s' % (str(error['ErrorID']), error['ErrorMsg'].decode('GBK')))
 
     def on_order(self, order_dict):
         self.on_debug('订单回报: %s' % str(order_dict))
@@ -183,7 +185,8 @@ class CtpGateway(object):
             self._env.event_bus.publish_event(RqEvent(EVENT.TRADE, account=account, trade=trade))
 
     def on_tick(self, tick_dict):
-        self._tick_que.put(tick_dict)
+        if tick_dict.order_book_id in self.subscribed:
+            self._tick_que.put(tick_dict)
         self._cache.cache_snapshot(tick_dict)
 
     def _connect(self):
