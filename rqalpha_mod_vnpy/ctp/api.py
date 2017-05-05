@@ -25,13 +25,13 @@ from ..utils import make_order_book_id
 
 
 ORDER_TYPE_MAPPING = {
-    ORDER_TYPE.MARKET: defineDict["THOST_FTDC_OPT_LimitPrice"],
-    ORDER_TYPE.LIMIT: defineDict["THOST_FTDC_OPT_AnyPrice"],
+    ORDER_TYPE.MARKET: defineDict["THOST_FTDC_OPT_AnyPrice"],
+    ORDER_TYPE.LIMIT: defineDict["THOST_FTDC_OPT_LimitPrice"],
 }
 
 SIDE_MAPPING = {
     SIDE.BUY: defineDict['THOST_FTDC_D_Buy'],
-    SIDE.SELL: defineDict['THOST_FTDC_D_Sell']
+    SIDE.SELL: defineDict['THOST_FTDC_D_Sell'],
 }
 
 POSITION_EFFECT_MAPPING = {
