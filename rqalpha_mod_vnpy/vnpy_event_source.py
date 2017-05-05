@@ -128,7 +128,10 @@ class VNPYEventSource(AbstractEventSource):
                     continue
                 else:
                     tick = self._gateway.get_tick()
-                    calendar_dt = parse(''.join((str(tick.date), str(tick.time/1000))))
+                    calendar_dt = parse(
+                        ''.join((str(tick.date), str(tick.time / 1000)))) if tick.time >= 100000000 else parse(
+                        '0'.join((str(tick.date), str(tick.time / 1000))))
+
                     if calendar_dt.hour > 20:
                         trading_dt = calendar_dt + timedelta(days=1)
                     else:
