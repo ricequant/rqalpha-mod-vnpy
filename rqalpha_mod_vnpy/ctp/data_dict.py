@@ -350,6 +350,8 @@ class TradeDict(DataDict):
         self.price = None
 
         self.is_valid = False
+        
+        self.update_data(data)
 
     def update_data(self, data):
         self.order_id = int(data['OrderRef'])
