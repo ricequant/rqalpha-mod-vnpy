@@ -18,27 +18,11 @@ from datetime import timedelta
 import re
 
 from rqalpha.environment import Environment
-from rqalpha.const import HEDGE_TYPE, POSITION_EFFECT, COMMISSION_TYPE
-from .vnpy import *
+from rqalpha.const import POSITION_EFFECT, COMMISSION_TYPE
 
 
 def make_underlying_symbol(id_or_symbol):
     return filter(lambda x: x not in '0123456789 ', id_or_symbol).upper()
-
-
-def make_position_effect(vnpy_exchange, vnpy_offset):
-    if vnpy_exchange == EXCHANGE_SHFE:
-        if vnpy_offset == OFFSET_OPEN:
-            return POSITION_EFFECT.OPEN
-        elif vnpy_offset == OFFSET_CLOSETODAY:
-            return POSITION_EFFECT.CLOSE_TODAY
-        else:
-            return POSITION_EFFECT.CLOSE
-    else:
-        if vnpy_offset == OFFSET_OPEN:
-            return POSITION_EFFECT.OPEN
-        else:
-            return POSITION_EFFECT.CLOSE
 
 
 def make_order_book_id(symbol):
@@ -58,20 +42,26 @@ def make_trading_dt(calendar_dt):
     return calendar_dt
 
 
-def cal_commission(order_book_id, position_effect, price, amount, hedge_type=HEDGE_TYPE.SPECULATION):
-    info = Environment.get_instance().get_future_commission_info(order_book_id, hedge_type)
+def cal_commission(trade_dict, position_effect):
+    order_book_id = trade_dict.order_book_id
+    env = Environment.get_instance()
+    info = env.data_proxy.get_commission_info(order_book_id)
     commission = 0
     if info['commission_type'] == COMMISSION_TYPE.BY_MONEY:
-        contract_multiplier = Environment.get_instance().get_instrument(order_book_id).contract_multiplier
+        contract_multiplier = env.get_instrument(trade_dict.order_book_id).contract_multiplier
         if position_effect == POSITION_EFFECT.OPEN:
-            commission += price * amount * contract_multiplier * info['open_commission_ratio']
-        else:
-            commission += price * amount * contract_multiplier * info['close_commission_ratio']
+            commission += trade_dict.price * trade_dict.amount * contract_multiplier * info['open_commission_ratio']
+        elif position_effect == POSITION_EFFECT.CLOSE:
+            commission += trade_dict.price * trade_dict.amount * contract_multiplier * info['close_commission_ratio']
+        elif position_effect == POSITION_EFFECT.CLOSE_TODAY:
+            commission += trade_dict.price * trade_dict.amount * contract_multiplier * info['close_commission_today_ratio']
     else:
-        if position_effect == POSITION_EFFECT.OPEN:
-            commission += amount * info['open_commission_ratio']
-        else:
-            commission += amount * info['close_commission_ratio']
+        if trade.position_effect == POSITION_EFFECT.OPEN:
+            commission += trade_dict.amount * info['open_commission_ratio']
+        elif position_effect == POSITION_EFFECT.CLOSE:
+            commission += trade_dict.amount * info['close_commission_ratio']
+        elif position_effect == POSITION_EFFECT.CLOSE_TODAY:
+            commission += trade_dict.amount * info['close_commission_today_ratio']
     return commission
 
 

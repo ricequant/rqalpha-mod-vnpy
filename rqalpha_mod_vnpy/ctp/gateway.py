@@ -145,6 +145,9 @@ class CtpGateway(object):
             elif order_dict.status in [ORDER_STATUS.CANCELLED, ORDER_STATUS.REJECTED]:
                 order.mark_rejected('Order was rejected or cancelled.')
                 self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_UNSOLICITED_UPDATE, account=account, order=order))
+                if order in self.open_orders:
+                    self.open_orders.remove(order)
+
             elif order_dict.status == ORDER_STATUS.FILLED:
                 order._status = order_dict.status
                 if order in self.open_orders:
@@ -185,8 +188,7 @@ class CtpGateway(object):
                 order = Order.__from_create__(trade_dict.calendar_dt, trade_dict.trading_dt, trade_dict.order_book_id,
                                               trade_dict.amount, trade_dict.side, trade_dict.style,
                                               trade_dict.position_effect)
-            commission = cal_commission(trade_dict.order_book_id, trade_dict.position_effect, trade_dict.price,
-                                        trade_dict.amount)
+            commission = cal_commission(trade_dict, order.position_effect)
             trade = Trade.__from_create__(
                 trade_dict.order_id, trade_dict.calendar_dt, trade_dict.trading_dt, trade_dict.price, trade_dict.amount,
                 trade_dict.side, trade_dict.position_effect, trade_dict.order_book_id, trade_id=trade_dict.trade_id,
