@@ -278,7 +278,6 @@ class OrderDict(DataDict):
         self.update_data(data, rejected)
 
     def update_data(self, data, rejected=False):
-        print(data)
         if not data['InstrumentID']:
             return
         try:
