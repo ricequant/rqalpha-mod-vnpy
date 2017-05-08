@@ -144,11 +144,11 @@ class CtpGateway(object):
                 order.mark_rejected('Order was rejected or cancelled.')
                 self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_UNSOLICITED_UPDATE, account=account, order=order))
             elif order_dict.status == ORDER_STATUS.FILLED:
-                order.status = order_dict.status
+                order._status = order_dict.status
 
         elif order.status == ORDER_STATUS.ACTIVE:
             if order_dict.status == ORDER_STATUS.FILLED:
-                order.status = order_dict.status
+                order._status = order_dict.status
             if order_dict.status == ORDER_STATUS.CANCELLED:
                 order.mark_cancelled("%d order has been cancelled." % order.order_id)
                 self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_CANCELLATION_PASS, account=account, order=order))
@@ -158,7 +158,7 @@ class CtpGateway(object):
                 order.mark_cancelled("%d order has been cancelled." % order.order_id)
                 self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_CANCELLATION_PASS, account=account, order=order))
             if order_dict.status == ORDER_STATUS.FILLED:
-                order.status = order_dict.status
+                order._status = order_dict.status
 
     def on_trade(self, trade_dict):
         if self._data_update_date != date.today():
