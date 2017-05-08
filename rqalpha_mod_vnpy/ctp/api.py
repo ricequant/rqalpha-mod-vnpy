@@ -816,13 +816,13 @@ class CtpTdApi(TdApi):
             'UserID': self.user_id,
             'BrokerID': self.broker_id,
 
-            'CombHedgeFlag': defineDict['THOST_FTDC_HF_Speculation'],       # 投机单
-            'ContingentCondition': defineDict['THOST_FTDC_CC_Immediately'], # 立即发单
-            'ForceCloseReason': defineDict['THOST_FTDC_FCC_NotForceClose'], # 非强平
-            'IsAutoSuspend': 0,                                             # 非自动挂起
-            'TimeCondition': defineDict['THOST_FTDC_TC_GFD'],               # 今日有效
-            'VolumeCondition': defineDict['THOST_FTDC_VC_AV'],              # 任意成交量
-            'MinVolume': 1,                                                 # 最小成交量为1
+            'CombHedgeFlag': defineDict['THOST_FTDC_HF_Speculation'],        # 投机单
+            'ContingentCondition': defineDict['THOST_FTDC_CC_Immediately'],  # 立即发单
+            'ForceCloseReason': defineDict['THOST_FTDC_FCC_NotForceClose'],  # 非强平
+            'IsAutoSuspend': 0,                                              # 非自动挂起
+            'TimeCondition': defineDict['THOST_FTDC_TC_GFD'],                # 今日有效
+            'VolumeCondition': defineDict['THOST_FTDC_VC_AV'],               # 任意成交量
+            'MinVolume': 1,                                                  # 最小成交量为1
         }
 
         self.req_id += 1

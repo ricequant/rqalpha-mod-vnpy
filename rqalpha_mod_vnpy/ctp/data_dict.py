@@ -272,11 +272,13 @@ class OrderDict(DataDict):
         self.position_effect = None
         self.status = None
 
+        self.style = None
         self.is_valid = False
 
         self.update_data(data, rejected)
 
     def update_data(self, data, rejected=False):
+        print(data)
         if not data['InstrumentID']:
             return
         try:
@@ -326,6 +328,9 @@ class OrderDict(DataDict):
                     self.status = ORDER_STATUS.FILLED
                 elif data['OrderStatus'] == defineDict["THOST_FTDC_OST_Canceled"]:
                     self.status = ORDER_STATUS.CANCELLED
+
+        self.style = LimitOrder(self.price)
+
         self.is_valid = True
 
 
