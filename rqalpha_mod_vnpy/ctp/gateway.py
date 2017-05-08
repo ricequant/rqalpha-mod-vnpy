@@ -125,6 +125,8 @@ class CtpGateway(object):
         system_log.error('CTP 错误，错误代码：%s，错误信息：%s' % (str(error['ErrorID']), error['ErrorMsg'].decode('GBK')))
 
     def on_order(self, order_dict):
+        if not order_dict.is_valid:
+            return
         self.on_debug('订单回报: %s' % str(order_dict))
         if self._data_update_date != date.today():
             return
@@ -145,6 +147,8 @@ class CtpGateway(object):
                 self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_UNSOLICITED_UPDATE, account=account, order=order))
             elif order_dict.status == ORDER_STATUS.FILLED:
                 order._status = order_dict.status
+                if order in self.open_orders:
+                    self.open_orders.remove(order)
 
         elif order.status == ORDER_STATUS.ACTIVE:
             if order_dict.status == ORDER_STATUS.FILLED:
@@ -152,13 +156,19 @@ class CtpGateway(object):
             if order_dict.status == ORDER_STATUS.CANCELLED:
                 order.mark_cancelled("%d order has been cancelled." % order.order_id)
                 self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_CANCELLATION_PASS, account=account, order=order))
+                if order in self.open_orders:
+                    self.open_orders.remove(order)
 
         elif order.status == ORDER_STATUS.PENDING_CANCEL:
             if order_dict.status == ORDER_STATUS.CANCELLED:
                 order.mark_cancelled("%d order has been cancelled." % order.order_id)
                 self._env.event_bus.publish_event(RqEvent(EVENT.ORDER_CANCELLATION_PASS, account=account, order=order))
+                if order in self.open_orders:
+                    self.open_orders.remove(order)
             if order_dict.status == ORDER_STATUS.FILLED:
                 order._status = order_dict.status
+                if order in self.open_orders:
+                    self.open_orders.remove(order)
 
     def on_trade(self, trade_dict):
         if self._data_update_date != date.today():

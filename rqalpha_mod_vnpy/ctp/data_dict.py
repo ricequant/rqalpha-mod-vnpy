@@ -327,6 +327,8 @@ class OrderDict(DataDict):
                     self.status = ORDER_STATUS.FILLED
                 elif data['OrderStatus'] == defineDict["THOST_FTDC_OST_Canceled"]:
                     self.status = ORDER_STATUS.CANCELLED
+                else:
+                    return
 
         self.style = LimitOrder(self.price)
 
