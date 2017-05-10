@@ -174,6 +174,7 @@ class CtpGateway(object):
                     self.open_orders.remove(order)
 
     def on_trade(self, trade_dict):
+        self.on_debug('交易回报: %s' % str(trade_dict))
         if self._data_update_date != date.today():
             self._cache.cache_trade(trade_dict)
         else:

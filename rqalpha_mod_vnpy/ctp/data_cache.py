@@ -50,8 +50,8 @@ class DataCache(object):
 
     def cache_trade(self, trade_dict):
         if trade_dict.order_book_id not in self._trade_cache:
-            self._trade_cache = []
-        self._trade_cache.append(trade_dict)
+            self._trade_cache[trade_dict.order_book_id] = []
+        self._trade_cache[trade_dict.order_book_id].append(trade_dict)
 
     def get_cached_order(self, order_dict):
         try:
@@ -96,17 +96,17 @@ class DataCache(object):
 
                 buy_today_holding_list = []
                 sell_today_holding_list = []
-
                 for trade_dict in trades:
                     if trade_dict.side == SIDE.BUY and trade_dict.position_effect == POSITION_EFFECT.OPEN:
-                        buy_today_holding_list.append((trade_dict.price, trade_dict.quantity))
+                        buy_today_holding_list.append((trade_dict.price, trade_dict.amount))
                     elif trade_dict.side == SIDE.SELL and trade_dict.position_effect == POSITION_EFFECT.OPEN:
-                        sell_today_holding_list.append((trade_dict.price, trade_dict.quantity))
+                        sell_today_holding_list.append((trade_dict.price, trade_dict.amount))
 
                 position._buy_today_holding_list = buy_today_holding_list
                 position._sell_today_holding_list = sell_today_holding_list
 
             ps[order_book_id] = position
+
         return ps
 
     @property
