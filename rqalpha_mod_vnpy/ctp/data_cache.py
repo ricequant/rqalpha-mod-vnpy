@@ -102,12 +102,31 @@ class DataCache(object):
                     elif trade_dict.side == SIDE.SELL and trade_dict.position_effect == POSITION_EFFECT.OPEN:
                         sell_today_holding_list.append((trade_dict.price, trade_dict.amount))
 
+                self.process_today_holding_list(pos_dict.buy_today_quantity, buy_today_holding_list)
+                self.process_today_holding_list(pos_dict.sell_today_quantity, sell_today_holding_list)
+
                 position._buy_today_holding_list = buy_today_holding_list
                 position._sell_today_holding_list = sell_today_holding_list
 
             ps[order_book_id] = position
 
         return ps
+
+    def process_today_holding_list(self, today_quantity, holding_list):
+        print(today_quantity, holding_list)
+        # check if list is empty
+        if not holding_list:
+            return
+        cum_quantity = sum(quantity for price, quantity in holding_list)
+        left_quantity = cum_quantity - today_quantity
+        while left_quantity > 0:
+            oldest_price, oldest_quantity = holding_list.pop()
+            if oldest_quantity > left_quantity:
+                consumed_quantity = left_quantity
+                holding_list.append(oldest_price, oldest_quantity - left_quantity)
+            else:
+                consumed_quantity = oldest_quantity
+            left_quantity -= consumed_quantity
 
     @property
     def account(self):
