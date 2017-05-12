@@ -153,8 +153,10 @@ class PositionDict(DataDict):
     def update_data(self, data):
 
         if data['PosiDirection'] in [defineDict["THOST_FTDC_PD_Net"], defineDict["THOST_FTDC_PD_Long"]]:
-            if data['YdPosition']:
+            if data['YdPosition'] and not data['TodayPosition']:
                 self.buy_old_quantity = data['Position']
+            if data['YdPosition'] and data['TodayPosition']:
+                self.buy_old_quantity = data['Position'] - data['TodayPosition']
             if data['TodayPosition']:
                 self.buy_today_quantity = data['TodayPosition']
 
