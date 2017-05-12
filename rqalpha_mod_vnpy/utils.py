@@ -35,13 +35,6 @@ def make_order_book_id(symbol):
     return order_book_id.upper()
 
 
-def make_trading_dt(calendar_dt):
-    # FIXME: 替换为 next_trading_date
-    if calendar_dt.hour > 20:
-        return calendar_dt + timedelta(days=1)
-    return calendar_dt
-
-
 def cal_commission(trade_dict, position_effect):
     order_book_id = trade_dict.order_book_id
     env = Environment.get_instance()

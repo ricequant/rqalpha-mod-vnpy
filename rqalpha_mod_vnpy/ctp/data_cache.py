@@ -57,9 +57,7 @@ class DataCache(object):
         try:
             order = self._order_cache[order_dict.order_id]
         except KeyError:
-            order = Order.__from_create__(order_dict.calendar_dt, order_dict.trading_dt, order_dict.order_book_id,
-                                          order_dict.quantity, order_dict.side, order_dict.style,
-                                          order_dict.position_effect)
+            order = Order.__from_create__(order_dict.order_book_id, order_dict.quantity, order_dict.side, order_dict.style, order_dict.position_effect)
             self.cache_order(order)
         return order
 
@@ -142,7 +140,7 @@ class DataCache(object):
         account._frozen_cash = sum(
             [margin_of(order_dict.order_book_id, order_dict.unfilled_quantity, order_dict.price) for order_dict in
              self._qry_order_cache.values() if order_dict.status == ORDER_STATUS.ACTIVE])
-        return account
+        return account, static_value
 
     @property
     def snapshot(self):

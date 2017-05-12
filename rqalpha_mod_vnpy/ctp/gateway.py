@@ -91,9 +91,10 @@ class CtpGateway(object):
         self.td_api.cancelOrder(order)
 
     def get_portfolio(self):
-        future_account = self._cache.account
+        future_account, static_value = self._cache.account
         start_date = self._env.config.base.start_date
-        return Portfolio(start_date, 1, future_account._total_cash, {ACCOUNT_TYPE.FUTURE: future_account})
+        future_starting_cash = self._env.config.base.future_starting_cash
+        return Portfolio(start_date, static_value/future_starting_cash, future_starting_cash, {ACCOUNT_TYPE.FUTURE: future_account})
 
     def get_ins_dict(self, order_book_id):
         return self._cache.ins.get(order_book_id)
@@ -190,12 +191,12 @@ class CtpGateway(object):
             try:
                 order = self.order_objects[trade_dict.order_id]
             except KeyError:
-                order = Order.__from_create__(trade_dict.calendar_dt, trade_dict.trading_dt, trade_dict.order_book_id,
+                order = Order.__from_create__(trade_dict.order_book_id,
                                               trade_dict.amount, trade_dict.side, trade_dict.style,
                                               trade_dict.position_effect)
             commission = cal_commission(trade_dict, order.position_effect)
             trade = Trade.__from_create__(
-                trade_dict.order_id, trade_dict.calendar_dt, trade_dict.trading_dt, trade_dict.price, trade_dict.amount,
+                trade_dict.order_id, trade_dict.price, trade_dict.amount,
                 trade_dict.side, trade_dict.position_effect, trade_dict.order_book_id, trade_id=trade_dict.trade_id,
                 commission=commission, frozen_price=trade_dict.price)
 

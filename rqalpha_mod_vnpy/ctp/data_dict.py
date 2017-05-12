@@ -1,10 +1,9 @@
-from dateutil.parser import parse
 import numpy as np
 
 from rqalpha.const import SIDE, POSITION_EFFECT, ORDER_STATUS, COMMISSION_TYPE, MARGIN_TYPE
 from rqalpha.model.order import LimitOrder
 
-from ..utils import make_order_book_id, make_underlying_symbol, is_future, make_trading_dt
+from ..utils import make_order_book_id, make_underlying_symbol, is_future
 from ..vnpy import *
 
 
@@ -260,8 +259,6 @@ class OrderDict(DataDict):
     def __init__(self, data, rejected=False):
         super(OrderDict, self).__init__()
         self.order_id = None
-        self.calendar_dt = None
-        self.trading_dt = None
         self.order_book_id = None
         self.front_id = None
         self.session_id = None
@@ -287,9 +284,6 @@ class OrderDict(DataDict):
             self.order_id = int(data['OrderRef'])
         except ValueError:
             self.order_id = np.nan
-        if 'InsertTime' in data:
-            self.calendar_dt = parse(data['InsertTime'])
-            self.trading_dt = make_trading_dt(self.calendar_dt)
 
         self.order_book_id = make_order_book_id(data['InstrumentID'])
 
@@ -343,8 +337,6 @@ class TradeDict(DataDict):
         super(TradeDict, self).__init__()
         self.order_id = None
         self.trade_id = None
-        self.calendar_dt = None
-        self.trading_dt = None
         self.order_book_id = None
 
         self.side = None
@@ -361,8 +353,6 @@ class TradeDict(DataDict):
     def update_data(self, data):
         self.order_id = int(data['OrderRef'])
         self.trade_id = data['TradeID']
-        self.calendar_dt = parse(data['TradeTime'])
-        self.trading_dt = make_trading_dt(self.calendar_dt)
         self.order_book_id = make_order_book_id(data['InstrumentID'])
 
         self.side = SIDE_REVERSE.get(data['Direction'], SIDE.BUY)
