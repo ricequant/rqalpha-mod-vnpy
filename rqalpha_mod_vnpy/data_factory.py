@@ -173,7 +173,7 @@ class DataFactory(object):
                 price = vnpy_order.price
                 frozen_cash += margin_of(order_book_id, unfilled_quantity, price)
         account._frozen_cash = frozen_cash
-        return account
+        return account, static_value
 
     # ------------------------------------ put data cache ------------------------------------
     def cache_order(self, order):

@@ -200,9 +200,10 @@ class RQVNPYEngine(object):
 
     # ------------------------------------ portfolio生命周期 ------------------------------------
     def get_portfolio(self):
-        future_account = self._data_factory.make_account_before_init()
+        future_account, static_value = self._data_factory.make_account_before_init()
         start_date = self._env.config.base.start_date
-        return Portfolio(start_date, 1, future_account._total_cash, {ACCOUNT_TYPE.FUTURE: future_account})
+        future_starting_cash = self._env.config.base.future_starting_cash
+        return Portfolio(start_date, static_value/future_starting_cash, future_starting_cash, {ACCOUNT_TYPE.FUTURE: future_account})
 
     # ------------------------------------ gateway 和 event engine生命周期 ------------------------------------
     def _init_gateway(self):
