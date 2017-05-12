@@ -130,11 +130,10 @@ class DataCache(object):
     def account(self):
         static_value = self._account_dict.yesterday_portfolio_value
         ps = self.positions
-        holding_pnl = sum(position.holding_pnl for position in six.itervalues(ps))
         realized_pnl = sum(position.realized_pnl for position in six.itervalues(ps))
         cost = sum(position.transaction_cost for position in six.itervalues(ps))
         margin = sum(position.margin for position in six.itervalues(ps))
-        total_cash = static_value + holding_pnl + realized_pnl - cost - margin
+        total_cash = static_value + realized_pnl - cost - margin
 
         account = FutureAccount(total_cash, ps)
         account._frozen_cash = sum(
