@@ -159,11 +159,10 @@ class DataFactory(object):
     def make_account_before_init(self):
         static_value = self._data_cache.account_cache_before_init['yesterday_portfolio_value']
         positions = self.make_positions_before_init()
-        holding_pnl = sum(position.holding_pnl for position in six.itervalues(positions))
         realized_pnl = sum(position.realized_pnl for position in six.itervalues(positions))
         cost = sum(position.transaction_cost for position in six.itervalues(positions))
         margin = sum(position.margin for position in six.itervalues(positions))
-        total_cash = static_value + holding_pnl + realized_pnl - cost - margin
+        total_cash = static_value + realized_pnl - cost - margin
 
         account = FutureAccount(total_cash, positions)
         frozen_cash = 0.
