@@ -75,16 +75,7 @@ def make_order_book_id(symbol):
     return order_book_id.upper()
 
 
-def make_trading_dt(calendar_dt):
-    # FIXME: 替换为 next_trading_date
-    if calendar_dt.hour > 20:
-        return calendar_dt + timedelta(days=1)
-    return calendar_dt
-
-
 def make_order(vnpy_order):
-    calendar_dt = parse(vnpy_order.orderTime)
-    trading_dt = make_trading_dt(calendar_dt)
     order_book_id = make_order_book_id(vnpy_order.symbol)
     quantity = vnpy_order.totalVolume
     side = SIDE_REVERSE[vnpy_order.direction]
@@ -92,7 +83,7 @@ def make_order(vnpy_order):
     position_effect = make_position_effect(vnpy_order.exchange, vnpy_order.offset)
     order_id = vnpy_order.orderID
 
-    order = Order.__from_create__(calendar_dt, trading_dt, order_book_id, quantity, side, style, position_effect)
+    order = Order.__from_create__(order_book_id, quantity, side, style, position_effect)
     order._filled_quantity = vnpy_order.totalVolume
     order._order_id = order_id
 
@@ -100,15 +91,12 @@ def make_order(vnpy_order):
 
 
 def make_order_from_vnpy_trade(vnpy_trade):
-    calendar_dt = parse(vnpy_trade.tradeTime)
-    trading_dt = make_trading_dt(calendar_dt)
     order_book_id = make_order_book_id(vnpy_trade.symbol)
     quantity = vnpy_trade.volume
     side = SIDE_REVERSE[vnpy_trade.direction]
     style = LimitOrder(vnpy_trade.price)
     position_effect = make_position_effect(vnpy_trade.exchange, vnpy_trade.offset)
-
-    order = Order.__from_create__(calendar_dt, trading_dt, order_book_id, quantity, side, style, position_effect)
+    order = Order.__from_create__(order_book_id, quantity, side, style, position_effect)
     order._filled_quantity = vnpy_trade.volume
     order._status = ORDER_STATUS.FILLED
     order._avg_price = vnpy_trade.price
@@ -135,8 +123,6 @@ def cal_commission(order_book_id, position_effect, price, amount, hedge_type=HED
 
 def make_trade(vnpy_trade, order_id=None):
     order_id = order_id if order_id is not None else next(Order.order_id_gen)
-    calendar_dt = parse(vnpy_trade.tradeTime)
-    trading_dt = make_trading_dt(calendar_dt)
     price = vnpy_trade.price
     amount = vnpy_trade.volume
     side = SIDE_REVERSE[vnpy_trade.direction]
@@ -146,7 +132,7 @@ def make_trade(vnpy_trade, order_id=None):
     frozen_price = vnpy_trade.price
 
     return Trade.__from_create__(
-        order_id, calendar_dt, trading_dt, price, amount, side, position_effect,  order_book_id,
+        order_id, price, amount, side, position_effect,  order_book_id,
         commission=commission, frozen_price=frozen_price)
 
 
