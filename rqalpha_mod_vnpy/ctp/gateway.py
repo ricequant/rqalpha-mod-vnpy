@@ -130,10 +130,6 @@ class CtpGateway(object):
             return
         self.on_debug('订单回报: %s' % str(order_dict))
         if self._data_update_date != date.today():
-            order = self._cache.get_cached_order(order_dict)
-            if order_dict.status == ORDER_STATUS.ACTIVE:
-                if order not in self.open_orders:
-                    self.open_orders.append(order)
             return
 
         order = self._cache.get_cached_order(order_dict)
@@ -307,6 +303,11 @@ class CtpGateway(object):
 
     def _qry_order(self):
         order_cache = self.__qry_order()
+        for order_dict in order_cache.values():
+            order = self._cache.get_cached_order(order_dict)
+            if order_dict.status == ORDER_STATUS.ACTIVE:
+                if order not in self.open_orders:
+                    self.open_orders.append(order)
         self._cache.cache_qry_order(order_cache)
 
     def _qry_commission(self):
