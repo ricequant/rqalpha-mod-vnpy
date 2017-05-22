@@ -22,17 +22,17 @@ from datetime import date
 
 
 class VNPYDataSource(BaseDataSource):
-    def __init__(self, env, data_factory):
+    def __init__(self, env, data_cache):
         path = env.config.base.data_bundle_path
         super(VNPYDataSource, self).__init__(path)
-        self._data_factory = data_factory
+        self._cache = data_cache
 
     def current_snapshot(self, instrument, frequency, dt):
         if frequency != 'tick':
             raise NotImplementedError
 
         order_book_id = instrument.order_book_id
-        tick_snapshot = self._data_factory.get_tick_snapshot(order_book_id)
+        tick_snapshot = self._cache.snapshot.get(order_book_id)
         if tick_snapshot is None:
             system_log.error('Cannot find such tick whose order_book_id is {} ', order_book_id)
         return SnapshotObject(instrument, tick_snapshot, dt)
@@ -46,5 +46,9 @@ class VNPYDataSource(BaseDataSource):
 
     def get_future_info(self, instrument, hedge_type):
         order_book_id = instrument.order_book_id
-        hedge_flag = hedge_type.value
-        return self._data_factory.get_future_info(order_book_id, hedge_flag)
+        try:
+            underlying_symbol = self._cache.ins.get(order_book_id).underlying_symbol
+            hedge_flag = hedge_type.value
+            return self._cache.future_info.get(underlying_symbol).get(hedge_flag)
+        except AttributeError:
+            return None

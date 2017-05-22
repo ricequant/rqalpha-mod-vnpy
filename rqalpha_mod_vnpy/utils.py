@@ -14,55 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dateutil.parser import parse
 from datetime import timedelta
-import numpy as np
+import re
 
-from rqalpha.model.order import Order, LimitOrder
-from rqalpha.model.trade import Trade
 from rqalpha.environment import Environment
-from rqalpha.const import ORDER_STATUS, HEDGE_TYPE, POSITION_EFFECT, SIDE, ORDER_TYPE, COMMISSION_TYPE
-from .vnpy import *
-
-
-SIDE_REVERSE = {
-        DIRECTION_LONG: SIDE.BUY,
-        DIRECTION_SHORT: SIDE.SELL,
-}
-
-SIDE_MAPPING = {
-    SIDE.BUY: DIRECTION_LONG,
-    SIDE.SELL: DIRECTION_SHORT
-}
-
-ORDER_TYPE_MAPPING = {
-    ORDER_TYPE.MARKET: PRICETYPE_MARKETPRICE,
-    ORDER_TYPE.LIMIT: PRICETYPE_LIMITPRICE
-}
-
-POSITION_EFFECT_MAPPING = {
-        POSITION_EFFECT.OPEN: OFFSET_OPEN,
-        POSITION_EFFECT.CLOSE: OFFSET_CLOSE,
-}
+from rqalpha.const import POSITION_EFFECT, COMMISSION_TYPE
 
 
 def make_underlying_symbol(id_or_symbol):
     return filter(lambda x: x not in '0123456789 ', id_or_symbol).upper()
-
-
-def make_position_effect(vnpy_exchange, vnpy_offset):
-    if vnpy_exchange == EXCHANGE_SHFE:
-        if vnpy_offset == OFFSET_OPEN:
-            return POSITION_EFFECT.OPEN
-        elif vnpy_offset == OFFSET_CLOSETODAY:
-            return POSITION_EFFECT.CLOSE_TODAY
-        else:
-            return POSITION_EFFECT.CLOSE
-    else:
-        if vnpy_offset == OFFSET_OPEN:
-            return POSITION_EFFECT.OPEN
-        else:
-            return POSITION_EFFECT.CLOSE
 
 
 def make_order_book_id(symbol):
@@ -75,113 +35,31 @@ def make_order_book_id(symbol):
     return order_book_id.upper()
 
 
-def make_order(vnpy_order):
-    order_book_id = make_order_book_id(vnpy_order.symbol)
-    quantity = vnpy_order.totalVolume
-    side = SIDE_REVERSE[vnpy_order.direction]
-    style = LimitOrder(vnpy_order.price)
-    position_effect = make_position_effect(vnpy_order.exchange, vnpy_order.offset)
-    order_id = vnpy_order.orderID
-
-    order = Order.__from_create__(order_book_id, quantity, side, style, position_effect)
-    order._filled_quantity = vnpy_order.totalVolume
-    order._order_id = order_id
-
-    return order
-
-
-def make_order_from_vnpy_trade(vnpy_trade):
-    order_book_id = make_order_book_id(vnpy_trade.symbol)
-    quantity = vnpy_trade.volume
-    side = SIDE_REVERSE[vnpy_trade.direction]
-    style = LimitOrder(vnpy_trade.price)
-    position_effect = make_position_effect(vnpy_trade.exchange, vnpy_trade.offset)
-    order = Order.__from_create__(order_book_id, quantity, side, style, position_effect)
-    order._filled_quantity = vnpy_trade.volume
-    order._status = ORDER_STATUS.FILLED
-    order._avg_price = vnpy_trade.price
-    order._transaction_cost = 0
-    return order
-
-
-def cal_commission(order_book_id, position_effect, price, amount, hedge_type=HEDGE_TYPE.SPECULATION):
-    info = Environment.get_instance().get_future_commission_info(order_book_id, hedge_type)
+def cal_commission(trade_dict, position_effect):
+    order_book_id = trade_dict.order_book_id
+    env = Environment.get_instance()
+    info = env.data_proxy.get_commission_info(order_book_id)
     commission = 0
     if info['commission_type'] == COMMISSION_TYPE.BY_MONEY:
-        contract_multiplier = Environment.get_instance().get_instrument(order_book_id).contract_multiplier
+        contract_multiplier = env.get_instrument(trade_dict.order_book_id).contract_multiplier
         if position_effect == POSITION_EFFECT.OPEN:
-            commission += price * amount * contract_multiplier * info['open_commission_ratio']
-        else:
-            commission += price * amount * contract_multiplier * info['close_commission_ratio']
+            commission += trade_dict.price * trade_dict.amount * contract_multiplier * info['open_commission_ratio']
+        elif position_effect == POSITION_EFFECT.CLOSE:
+            commission += trade_dict.price * trade_dict.amount * contract_multiplier * info['close_commission_ratio']
+        elif position_effect == POSITION_EFFECT.CLOSE_TODAY:
+            commission += trade_dict.price * trade_dict.amount * contract_multiplier * info['close_commission_today_ratio']
     else:
         if position_effect == POSITION_EFFECT.OPEN:
-            commission += amount * info['open_commission_ratio']
-        else:
-            commission += amount * info['close_commission_ratio']
+            commission += trade_dict.amount * info['open_commission_ratio']
+        elif position_effect == POSITION_EFFECT.CLOSE:
+            commission += trade_dict.amount * info['close_commission_ratio']
+        elif position_effect == POSITION_EFFECT.CLOSE_TODAY:
+            commission += trade_dict.amount * info['close_commission_today_ratio']
     return commission
 
 
-def make_trade(vnpy_trade, order_id=None):
-    order_id = order_id if order_id is not None else next(Order.order_id_gen)
-    price = vnpy_trade.price
-    amount = vnpy_trade.volume
-    side = SIDE_REVERSE[vnpy_trade.direction]
-    position_effect = make_position_effect(vnpy_trade.exchange, vnpy_trade.offset)
-    order_book_id = make_order_book_id(vnpy_trade.symbol)
-    commission = cal_commission(order_book_id, position_effect, price, amount)
-    frozen_price = vnpy_trade.price
-
-    return Trade.__from_create__(
-        order_id, price, amount, side, position_effect,  order_book_id,
-        commission=commission, frozen_price=frozen_price)
-
-
-def make_tick(vnpy_tick):
-    order_book_id = make_order_book_id(vnpy_tick.symbol)
-    tick = {
-        'order_book_id': order_book_id,
-        'datetime': parse('%s %s' % (vnpy_tick.date, vnpy_tick.time)),
-        'open': vnpy_tick.openPrice,
-        'last': vnpy_tick.lastPrice,
-        'low': vnpy_tick.lowPrice,
-        'high': vnpy_tick.highPrice,
-        'prev_close': vnpy_tick.preClosePrice,
-        'volume': vnpy_tick.volume,
-        'total_turnover': np.nan,
-        'open_interest': vnpy_tick.openInterest,
-        'prev_settlement': np.nan,
-
-        'b1': vnpy_tick.bidPrice1,
-        'b2': vnpy_tick.bidPrice2,
-        'b3': vnpy_tick.bidPrice3,
-        'b4': vnpy_tick.bidPrice4,
-        'b5': vnpy_tick.bidPrice5,
-
-        'b1_v': vnpy_tick.bidVolume1,
-        'b2_v': vnpy_tick.bidVolume2,
-        'b3_v': vnpy_tick.bidVolume3,
-        'b4_v': vnpy_tick.bidVolume4,
-        'b5_v': vnpy_tick.bidVolume5,
-
-
-        'a1': vnpy_tick.askPrice1,
-        'a2': vnpy_tick.askPrice2,
-        'a3': vnpy_tick.askPrice3,
-        'a4': vnpy_tick.askPrice4,
-        'a5': vnpy_tick.askPrice5,
-
-        'a1_v': vnpy_tick.askVolume1,
-        'a2_v': vnpy_tick.askVolume2,
-        'a3_v': vnpy_tick.askVolume3,
-        'a4_v': vnpy_tick.askVolume4,
-        'a5_v': vnpy_tick.askVolume5,
-
-
-        'limit_up': vnpy_tick.upperLimit,
-        'limit_down': vnpy_tick.lowerLimit,
-    }
-
-    return tick
-
-
+def is_future(order_book_id):
+    if order_book_id is None:
+        return False
+    return re.match('^[a-zA-Z]+[0-9]+$', order_book_id) is not None
 

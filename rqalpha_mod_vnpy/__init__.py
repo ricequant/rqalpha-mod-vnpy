@@ -21,6 +21,8 @@ __config__ = {
     "vn_trader_path": None,
     "all_day": True,
     "query_interval": 2,
+    "default_data_source": True,
+    "temp_path": "./vnpy_temp",
     "CTP": {
         'userID': None,
         'password': None,

@@ -16,6 +16,7 @@
 # limitations under the License.
 
 from datetime import timedelta, datetime, date
+from dateutil.parser import parse
 from threading import Thread
 from enum import Enum
 
@@ -34,10 +35,10 @@ class TimePeriod(Enum):
 
 # TODO: 目前只考虑了期货的场景
 class VNPYEventSource(AbstractEventSource):
-    def __init__(self, env, mod_config, vnpy_engine):
+    def __init__(self, env, mod_config, gateway):
         self._env = env
         self._mod_config = mod_config
-        self._engine = vnpy_engine
+        self._gateway = gateway
         self._before_trading_processed = False
         self._after_trading_processed = False
         self._time_period = None
@@ -126,8 +127,11 @@ class VNPYEventSource(AbstractEventSource):
                     self._before_trading_processed = True
                     continue
                 else:
-                    tick = self._engine.get_tick()
-                    calendar_dt = tick['datetime']
+                    tick = self._gateway.get_tick()
+                    calendar_dt = parse(
+                        ''.join((str(tick.date), str(tick.time / 1000)))) if tick.time >= 100000000 else parse(
+                        '0'.join((str(tick.date), str(tick.time / 1000))))
+
                     if calendar_dt.hour > 20:
                         trading_dt = calendar_dt + timedelta(days=1)
                     else:

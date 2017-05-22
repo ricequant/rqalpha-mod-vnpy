@@ -16,6 +16,7 @@
 # limitations under the License.
 
 from rqalpha.interface import AbstractBroker
+from rqalpha.environment import Environment
 from rqalpha.model.account import BenchmarkAccount, FutureAccount
 from rqalpha.const import ACCOUNT_TYPE
 
@@ -35,33 +36,36 @@ def init_accounts(env):
 
 
 class VNPYBroker(AbstractBroker):
-    def __init__(self, vnpy_engine):
-        self. _accounts = None
-
-        self._engine = vnpy_engine
-
-        self._account_cache = None
+    def __init__(self, gateway):
+        self._gateway = gateway
+        self._open_orders = []
 
     def after_trading(self):
         pass
 
     def before_trading(self):
-        pass
+        self._gateway.connect_and_sync_data()
+        for account, order in self._open_orders:
+            order.active()
+            self._env.event_bus.publish_event(Event(EVENT.ORDER_CREATION_PASS, account=account, order=order))
 
     def get_open_orders(self, order_book_id=None):
-        return self._engine.get_open_orders(order_book_id)
+        if order_book_id is not None:
+            return [order for order in self._gateway.open_orders if order.order_book_id == order_book_id]
+        else:
+            return self._gateway.open_orders
 
     def submit_order(self, order):
-        self._engine.send_order(order)
+        self._gateway.submit_order(order)
 
     def cancel_order(self, order):
-        self._engine.cancel_order(order)
+        self._gateway.cancel_order(order)
 
     def update(self, calendar_dt, trading_dt, bar_dict):
         pass
 
     def get_portfolio(self):
-        return self._engine.get_portfolio()
+        return self._gateway.get_portfolio()
 
     def get_benchmark_portfolio(self):
         return None
