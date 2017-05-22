@@ -91,8 +91,6 @@ python rqalpha_vnpy_test.py
 ```
 
 
-
-
 ## FAQ
 * 为什么策略在初始化期间停滞了几十秒甚至数分钟？   
 
@@ -111,8 +109,10 @@ python rqalpha_vnpy_test.py
     请尝试将配置文件中的 frequency 设置为 tick。
 
 
-## TODO
+## History
 
-* rqalpha-mod-vnpy 的结构和数据流程图
-* 包含 VN.PY 或 vn.trader 的一键部署包
-* 接入其他接口
+* 0.9.30
+    * 脱离对 vn.py 上层代码的依赖，直接对接 TdApi 和 MdApi 类。
+    * 启动时不再因为 vn.py 接口不完整报错。
+    * 修复断线重连及账户恢复时的若干 bug。
+    * 提升运行效率
