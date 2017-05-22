@@ -1,10 +1,9 @@
 import six
 
-from rqalpha.model.position import Positions
-from rqalpha.model.position.future_position import FuturePosition
+from rqalpha.model.base_position import Positions
 from rqalpha.model.account.future_account import FutureAccount, margin_of
 from rqalpha.model.order import Order
-from rqalpha.const import SIDE, POSITION_EFFECT, ORDER_STATUS
+from rqalpha.const import SIDE, POSITION_EFFECT, ORDER_STATUS, ACCOUNT_TYPE
 
 
 class DataCache(object):
@@ -19,6 +18,9 @@ class DataCache(object):
         self._snapshot_cache = {}
 
         self._order_cache = {}
+
+        self._account_model = None
+        self._position_model = None
 
     def cache_ins(self, ins_cache):
         self._ins_cache = ins_cache
@@ -74,9 +76,10 @@ class DataCache(object):
 
     @property
     def positions(self):
-        ps = Positions(FuturePosition)
+        PositionModel = self._position_model
+        ps = Positions(PositionModel)
         for order_book_id, pos_dict in six.iteritems(self._pos_cache):
-            position = FuturePosition(order_book_id)
+            position = PositionModel(order_book_id)
 
             position._buy_old_holding_list = [(pos_dict.prev_settle_price, pos_dict.buy_old_quantity)]
             position._sell_old_holding_list = [(pos_dict.prev_settle_price, pos_dict.sell_old_quantity)]
@@ -107,7 +110,6 @@ class DataCache(object):
                 position._sell_today_holding_list = sell_today_holding_list
 
             ps[order_book_id] = position
-
         return ps
 
     def process_today_holding_list(self, today_quantity, holding_list):
@@ -135,7 +137,8 @@ class DataCache(object):
         margin = sum(position.margin for position in six.itervalues(ps))
         total_cash = static_value + realized_pnl - cost - margin
 
-        account = FutureAccount(total_cash, ps)
+        AccountModel = self._account_model
+        account = AccountModel(total_cash, ps)
         account._frozen_cash = sum(
             [margin_of(order_dict.order_book_id, order_dict.unfilled_quantity, order_dict.price) for order_dict in
              self._qry_order_cache.values() if order_dict.status == ORDER_STATUS.ACTIVE])
@@ -144,6 +147,10 @@ class DataCache(object):
     @property
     def snapshot(self):
         return self._snapshot_cache
+
+    def set_models(self, account_model, position_model):
+        self._account_model = account_model
+        self._position_model = position_model
 
 
 class RQObjectCache(object):

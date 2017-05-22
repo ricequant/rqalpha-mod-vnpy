@@ -66,7 +66,7 @@ class CtpGateway(object):
             self._qry_position()
             self._qry_order()
             self._data_update_date = date.today()
-            self._qry_commission()
+            # self._qry_commission()
 
         self._subscribe_all()
         self.on_log('数据同步完成。')
@@ -91,6 +91,9 @@ class CtpGateway(object):
         self.td_api.cancelOrder(order)
 
     def get_portfolio(self):
+        FuturePosition = self._env.get_position_model(ACCOUNT_TYPE.FUTURE)
+        FutureAccount = self._env.get_account_model(ACCOUNT_TYPE.FUTURE)
+        self._cache.set_models(FutureAccount, FuturePosition)
         future_account, static_value = self._cache.account
         start_date = self._env.config.base.start_date
         future_starting_cash = self._env.config.base.future_starting_cash
