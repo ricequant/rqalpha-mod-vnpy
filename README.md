@@ -55,8 +55,8 @@ rqalpha mod uninstall vnpy
     "vn_trader_path": None,
     # 您使用 simnow 模拟交易时可以选择使用24小时服务器，该服务器允许您在收盘时间测试相关 API，如果您需要全天候测试，您需要开启此项。
     "all_day": True,
-    # 向 CTP 发送请求对时间间隔，设置过小会导致请求被吞掉
-    "query_interval": 2,
+    # VN.PY 创建临时文件的目录
+    "temp_path": "./vnpy_temp",
     # 以下是您的 CTP 账户信息，由于您需要将密码明文写在配置文件中，您需要注意保护个人隐私。
     "CTP": {
         "userID": "",
