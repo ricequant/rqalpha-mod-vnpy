@@ -105,7 +105,7 @@ class Broker(AbstractBroker):
         try:
             vt_orderid = self._order_id_map[order.order_id]
         except KeyError:
-            user_system_log.warning(f"订单[{order.order_id}]扯单失败，该订单不存在")
+            user_system_log.warning(f"订单[{order.order_id}]撤单失败，该订单不存在")
             self._publish_order_event(EVENT.ORDER_CANCELLATION_REJECT, order)
             return
         ins = self._env.data_proxy.instruments(order.order_book_id)
