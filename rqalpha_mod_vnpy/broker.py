@@ -16,8 +16,9 @@
 #         详细的授权流程，请联系 public@ricequant.com 获取。
 
 from typing import Dict, Optional
+from queue import Queue
 
-from vnpy.event import Event as VNEvent
+from vnpy.event import EventEngine as VNEventEngine
 from vnpy.trader.event import EVENT_ORDER as VN_EVENT_ORDER, EVENT_TRADE as VN_EVENT_TRADE
 from vnpy.trader.gateway import BaseGateway as VNBaseGateway
 from vnpy.trader.object import (
@@ -33,22 +34,32 @@ from rqalpha.model import Order, Trade, Instrument
 from rqalpha.core.events import Event, EVENT
 from rqalpha.utils.logger import user_system_log
 
-from .events import EventEngine
 from .consts import ACCOUNT_TYPE, DIRECTION_OFFSET_MAP, EXCHANGE_MAP
+
+EVENT_VN_ORDER = "EVENT_VN_ORDER"
+EVENT_VN_TRADE = "EVENT_VN_TRADE"
 
 
 # TODO: 中端重启后的订单状态恢复
 class Broker(AbstractBroker):
-    def __init__(self, env: Environment, vn_gateways: Dict[ACCOUNT_TYPE, VNBaseGateway], event_engine: EventEngine):
+    def __init__(
+            self,
+            env: Environment,
+            rqa_event_queue: Queue,
+            vn_event_engine: VNEventEngine,
+            vn_gateways: Dict[ACCOUNT_TYPE, VNBaseGateway]
+    ):
         self._env = env
         self._gateways = vn_gateways
-        self._event_engine = event_engine
 
         self._open_orders: Dict[str, Order] = {}  # vt_orderid: Order
         self._order_id_map: Dict[int, str] = {}  # order_id: vt_orderid
 
-        event_engine.add_rqa_listener(VN_EVENT_ORDER, self._on_order)
-        event_engine.add_rqa_listener(VN_EVENT_TRADE, self._on_trade)
+        vn_event_engine.register(VN_EVENT_ORDER, lambda e: rqa_event_queue.put(Event(EVENT_VN_ORDER, vn_event=e)))
+        vn_event_engine.register(VN_EVENT_TRADE, lambda e: rqa_event_queue.put(Event(EVENT_VN_TRADE, vn_event=e)))
+
+        self._env.event_bus.add_listener(EVENT_VN_ORDER, self._on_vn_order)
+        self._env.event_bus.add_listener(EVENT_VN_TRADE, self._on_vn_trade)
 
     def submit_order(self, order: Order):
         ins = self._env.data_proxy.instruments(order.order_book_id)
@@ -96,9 +107,9 @@ class Broker(AbstractBroker):
         else:
             return list(self._open_orders.values())
 
-    def _on_order(self, vn_event: VNEvent):
+    def _on_vn_order(self, event: Event):
         # run in main thread
-        vn_order: VNOrderData = vn_event.data
+        vn_order: VNOrderData = event.vn_event.data  # noqa
         if vn_order.status == VNStatus.SUBMITTING:
             return
         try:
@@ -121,9 +132,9 @@ class Broker(AbstractBroker):
         # 不处理 PARTTRADED 和 ALLTRADED，由 _on_trade 处理
         self._pop_if_order_is_final(order)
 
-    def _on_trade(self, vn_event: VNEvent):
+    def _on_vn_trade(self, event: Event):
         # run in main thread
-        vn_trade: VNTradeData = vn_event.data
+        vn_trade: VNTradeData = event.vn_event.data  # noqa
         try:
             order = self._open_orders[vn_trade.vt_orderid]
         except KeyError:
