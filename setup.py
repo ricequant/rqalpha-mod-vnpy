@@ -19,7 +19,8 @@ from os.path import dirname, join
 from setuptools import find_packages, setup
 
 requires = [
-    "vnpy>= 2.3.0"
+    "vnpy>= 2.3.0",
+    "rqalpha> 4.5.0"
 ]
 
 

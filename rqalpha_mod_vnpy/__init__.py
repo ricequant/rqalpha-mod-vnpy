@@ -16,20 +16,29 @@
 # limitations under the License.
 
 
-__config__ = {
-    "gateway_type": 'CTP',
-    "vn_trader_path": None,
-    "all_day": True,
-    "query_interval": 2,
-    "default_data_source": True,
-    "temp_path": "./vnpy_temp",
-    "CTP": {
-        'userID': None,
-        'password': None,
-        'brokerID': '9999',
-        'tdAddress': 'tcp://180.168.146.187:10030',
-        'mdAddress': 'tcp://180.168.146.187:10031'
+"""
+__config__ = {"mod": {"vnpy": {
+    "gateways: {
+        "FUTURE": {
+            "name": "CTP",
+            "app": "vnpy.gateway.ctp:CtpGateway",
+            "settings": {
+                "用户名": "",
+                "密码": "",
+                "经纪商代码": "9999",
+                "交易服务器": "tcp://180.168.146.187:10100",
+                "行情服务器": "tcp://180.168.146.187:10110",
+                "产品名称": "simnow_client_test",
+                "授权编码": "0000000000000000"
+            }
+        },
+        "STOCK": {}
     }
+}}}
+"""
+
+__config__ = {
+    "gateways": {},
 }
 
 
