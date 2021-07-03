@@ -16,12 +16,11 @@
 # limitations under the License.
 
 from os.path import dirname, join
-from pip.req import parse_requirements
+from setuptools import find_packages, setup
 
-from setuptools import (
-    find_packages,
-    setup,
-)
+requires = [
+    "vnpy>= 2.3.0"
+]
 
 
 with open(join(dirname(__file__), 'rqalpha_mod_vnpy/VERSION.txt'), 'rb') as f:
