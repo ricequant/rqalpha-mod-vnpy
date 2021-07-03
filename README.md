@@ -94,20 +94,23 @@ python rqalpha_vnpy_test.py
 ## FAQ
 * 为什么策略在初始化期间停滞了几十秒甚至数分钟？   
 
-	*程序在启动前，需要从 CTP 获取 Instrument 和 Commission 等数据，由于下边问题的原因，像 CTP 发送大量请求会占用很长时间。您可以将 log_level 设置成 verbose 来查看详细的回调函数执行情况。未来可能会考虑开放设置是否全量更新 commission 信息以换取更快的启动速度。*
+	程序在启动前，需要从 CTP 获取 Instrument 和 Commission 等数据，由于CTP控流等原因，像 CTP 发送大量请求会占用很长时间。您可以将 log_level 设置成 verbose 来查看详细的回调函数执行情况。未来可能会考虑开放设置是否全量更新 commission 信息以换取更快的启动速度。*
 
 * 为什么我在RQAlpha中查询到的账户、持仓信息与我通过快期、vn.trader 等终端查询到的不一致？
 
-	*本 mod 会尽力将您的账户信息恢复至 RQAlpha 中，但由于计算逻辑的不同，可能会导致各个终端显示的数字有差异，另外您通过其他终端下单交易也有可能导致数据同步的不及时。不过这也有可能是程序bug，如果您发现不一致情况严重，欢迎通过Issue的方式向作者提出。*
+	本 mod 会尽力将您的账户信息恢复至 RQAlpha 中，但由于计算逻辑的不同，可能会导致各个终端显示的数字有差异，另外您通过其他终端下单交易也有可能导致数据同步的不及时。不过这也有可能是程序bug，如果您发现不一致情况严重，欢迎通过Issue的方式向作者提出。*
 
 * VN.PY 的环境配置和安装比较复杂，我搞不定／懒得搞怎么办？
 
-	*作者会尽力研究，争取将VN.PY的安装包含进 mod 中，通过 pip 的形式一键安装，在这之前，作者会提供一个开箱即用虚拟机镜像，供您直接下载使用。*
+	作者会尽力研究，争取将VN.PY的安装包含进 mod 中，通过 pip 的形式一键安装，在这之前，作者会提供一个开箱即用虚拟机镜像，供您直接下载使用。*
 
 * 为什么会报 NotImplementedError？
 
     请尝试将配置文件中的 frequency 设置为 tick。
+    
+* 我如何在 python3.x 下使用该 mod？
 
+    您可以尝试使用 [rqalpha-mod-ctp](https://github.com/ricequant/rqalpha-mod-ctp)， 该 mod 实现了 python3.x 的支持。待 rqalpha-mod-ctp 逐步完善后，rqalpha-mod-vnpy 将不再维护。
 
 ## History
 
