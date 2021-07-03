@@ -15,7 +15,7 @@
 #         在此前提下，对本软件的使用同样需要遵守 Apache 2.0 许可，Apache 2.0 许可与本许可冲突之处，以本许可为准。
 #         详细的授权流程，请联系 public@ricequant.com 获取。
 
-from typing import Dict, Union, Optional
+from typing import Dict, Optional
 
 from vnpy.event import Event as VNEvent
 from vnpy.trader.event import EVENT_ORDER as VN_EVENT_ORDER, EVENT_TRADE as VN_EVENT_TRADE
@@ -24,47 +24,20 @@ from vnpy.trader.object import (
     OrderRequest as VNOrderRequest, OrderData as VNOrderData, TradeData as VNTradeData,
     CancelRequest as VNCancelOrderRequest
 )
-from vnpy.trader.constant import (
-    Exchange as VNExchange, Direction as VNDirection, Offset as VNOffset, OrderType as VNOrderType, Status as VNStatus
-)
+from vnpy.trader.constant import Status as VNStatus
 
 from rqalpha.environment import Environment
 from rqalpha.interface import AbstractBroker
-from rqalpha.const import DEFAULT_ACCOUNT_TYPE, EXCHANGE, SIDE, POSITION_EFFECT, ORDER_TYPE, ORDER_STATUS
+from rqalpha.const import ORDER_TYPE, ORDER_STATUS
 from rqalpha.model import Order, Trade, Instrument
 from rqalpha.core.events import Event, EVENT
 from rqalpha.utils.logger import user_system_log
 
 from .events import EventEngine
-
-ACCOUNT_TYPE = Union[DEFAULT_ACCOUNT_TYPE, str]
-
-
-EXCHANGE_MAP = {
-    EXCHANGE.XSHE: VNExchange.SSE,
-    EXCHANGE.XSHG: VNExchange.SZSE,
-    EXCHANGE.SHFE: VNExchange.SHFE,
-    EXCHANGE.CFFEX: VNExchange.CFFEX,
-    EXCHANGE.DCE: VNExchange.DCE,
-    EXCHANGE.INE: VNExchange.INE,
-    EXCHANGE.CZCE: VNExchange.CZCE
-}
-
-DIRECTION_OFFSET_MAP = {
-    (SIDE.BUY, POSITION_EFFECT.OPEN): (VNDirection.LONG, VNOffset.OPEN),
-    (SIDE.SELL, POSITION_EFFECT.OPEN): (VNDirection.SHORT, VNOffset.OPEN),
-    (SIDE.SELL, POSITION_EFFECT.CLOSE): (VNDirection.LONG, VNOffset.CLOSE),
-    (SIDE.BUY, POSITION_EFFECT.CLOSE): (VNDirection.SHORT, VNOffset.CLOSE),
-    (SIDE.SELL, POSITION_EFFECT.CLOSE_TODAY): (VNDirection.LONG, VNOffset.CLOSETODAY),
-    (SIDE.BUY, POSITION_EFFECT.CLOSE_TODAY): (VNDirection.SHORT, VNOffset.CLOSETODAY)
-}
-
-ORDER_TYPE_MAP = {
-    ORDER_TYPE.MARKET: VNOrderType.MARKET,
-    ORDER_TYPE.LIMIT: VNOrderType.LIMIT
-}
+from .consts import ACCOUNT_TYPE, DIRECTION_OFFSET_MAP, EXCHANGE_MAP
 
 
+# TODO: 中端重启后的订单状态恢复
 class Broker(AbstractBroker):
     def __init__(self, env: Environment, vn_gateways: Dict[ACCOUNT_TYPE, VNBaseGateway], event_engine: EventEngine):
         self._env = env
