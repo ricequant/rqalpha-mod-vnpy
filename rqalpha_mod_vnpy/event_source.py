@@ -22,7 +22,7 @@ from enum import Enum
 
 from rqalpha.utils.logger import system_log
 from rqalpha.interface import AbstractEventSource
-from rqalpha.events import Event, EVENT
+from rqalpha.core.events import Event, EVENT
 from rqalpha.utils import RqAttrDict
 
 
