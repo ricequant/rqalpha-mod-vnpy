@@ -29,12 +29,12 @@ from vnpy.trader.constant import Status as VNStatus
 
 from rqalpha.environment import Environment
 from rqalpha.interface import AbstractBroker
-from rqalpha.const import ORDER_TYPE, ORDER_STATUS
+from rqalpha.const import ORDER_STATUS
 from rqalpha.model import Order, Trade, Instrument
 from rqalpha.core.events import Event, EVENT
-from rqalpha.utils.logger import user_system_log
+from rqalpha.utils.logger import user_system_log, system_log
 
-from .consts import ACCOUNT_TYPE, DIRECTION_OFFSET_MAP, EXCHANGE_MAP
+from .consts import ACCOUNT_TYPE, DIRECTION_OFFSET_MAP, EXCHANGE_MAP, ORDER_TYPE_MAP
 
 EVENT_VN_ORDER = "EVENT_VN_ORDER"
 EVENT_VN_TRADE = "EVENT_VN_TRADE"
@@ -68,7 +68,7 @@ class Broker(AbstractBroker):
             symbol=ins.trading_code,
             exchange=EXCHANGE_MAP[ins.exchange],
             direction=direction,
-            type=ORDER_TYPE[order.type],
+            type=ORDER_TYPE_MAP[order.type],
             volume=order.quantity,
             price=order.price,
             offset=offset,
@@ -110,11 +110,12 @@ class Broker(AbstractBroker):
     def _on_vn_order(self, event: Event):
         # run in main thread
         vn_order: VNOrderData = event.vn_event.data  # noqa
-        if vn_order.status == VNStatus.SUBMITTING:
-            return
         try:
             order = self._open_orders[vn_order.vt_orderid]
         except KeyError:
+            return
+        system_log.debug(f"on_vn_order: {vn_order}")
+        if vn_order.status == VNStatus.SUBMITTING:
             return
         if order.status == ORDER_STATUS.PENDING_NEW:
             order.active()
@@ -139,6 +140,7 @@ class Broker(AbstractBroker):
             order = self._open_orders[vn_trade.vt_orderid]
         except KeyError:
             return
+        system_log.debug(f"on_vn_order: {vn_trade}")
         # TODO: 会不会重复收到 trade？
         trade = Trade.__from_create__(
             order_id=order.order_id,
@@ -165,7 +167,7 @@ class Broker(AbstractBroker):
         if ins:
             account = self._env.portfolio.accounts[ins.account_type]
         else:
-            account = self._env.portfolio.get_account(ins.order_book_id)
+            account = self._env.portfolio.get_account(order.order_book_id)
         self._env.event_bus.publish_event(Event(event_type, account=account, order=order))
 
     def _pop_if_order_is_final(self, order: Order):

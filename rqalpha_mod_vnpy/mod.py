@@ -34,6 +34,7 @@ from .broker import Broker
 from .consts import ACCOUNT_TYPE, LOG_LEVEL_MAP
 
 
+# TODO: 等待 VN.PY gateway 真正 ready 后再执行策略逻辑，这里需要 VN.PY gateway 给出连接状态
 class VNPYMod(AbstractMod):
     def __init__(self):
         self._vn_gateways: Dict[ACCOUNT_TYPE, VNBaseGateway] = {}
