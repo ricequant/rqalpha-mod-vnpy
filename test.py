@@ -1,5 +1,5 @@
 import sys
-from datetime import date
+from datetime import date, datetime, time
 
 import rqdatac
 
@@ -47,19 +47,33 @@ config = {
 
 
 def init(context):
-    contracts = rqdatac.options.get_contracts("AL", "C", maturity="2108", trading_date=date.today())
-    print(f"subscribe {len(contracts)} contracts {contracts}")
-    subscribe(contracts)
+    context.counter = 0
+    context.target_contract = None
+    context.contracts = rqdatac.options.get_contracts("CU", "C", maturity="2108", trading_date=date.today())
+    subscribe(context.contracts)
+    print(f"{len(context.contracts)} contracts subscribed: {context.contracts}")
 
 
 def handle_tick(context, tick):
-    print(tick)
+    context.counter += 1
+    if context.counter <= 50:
+        print(tick)
+    if context.counter == 1:
+        context.target_contract = tick.order_book_id
+        print(f"BUY_OPEN {context.target_contract}")
+        buy_open(tick.order_book_id, 1, tick.limit_up)
+    if context.counter <= 10:
+        print(get_position(context.target_contract, POSITION_DIRECTION.LONG))
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         print("Usage: python test.py <SIMNOW_username> <SIMNOW_password>")
     else:
-        ctp_settings = config["mod"]["vnpy"]["gateways"]["FUTURE"]["settings"]
+        ctp_settings: dict = config["mod"]["vnpy"]["gateways"]["FUTURE"]["settings"]
         _, ctp_settings["用户名"], ctp_settings["密码"] = sys.argv
+        if time(15, 30) <= datetime.now().time() < time(21):
+            # simnow 24 小时服务器
+            ctp_settings["交易服务器"] = "tcp://180.168.146.187:10130",
+            ctp_settings["行情服务器"] = "tcp://180.168.146.187:10131"
         run_func(config=config, init=init, handle_tick=handle_tick)
