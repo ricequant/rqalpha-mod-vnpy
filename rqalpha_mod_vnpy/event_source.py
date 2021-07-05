@@ -21,6 +21,8 @@ from queue import Queue, Empty
 from operator import itemgetter
 from typing import Optional, Dict, Set
 
+import rqdatac
+
 from vnpy.event import EventEngine as VNEventEngine, Event as VNEvent
 from vnpy.trader.gateway import BaseGateway as VNBaseGateway
 from vnpy.trader.object import SubscribeRequest as VNSubscribeRequest, TickData as VNTickData
@@ -82,7 +84,6 @@ class MarketEventPublisher:
 
 @lru_cache()
 def get_tick_trading_period(order_book_id):
-    # noinspection PyUnresolvedReferences
     trading_hours = rqdatac.get_trading_hours(order_book_id, frequency="tick")
     trading_period = list()
     trading_hours = trading_hours.replace("-", ":")

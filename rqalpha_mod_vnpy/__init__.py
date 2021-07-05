@@ -18,7 +18,7 @@
 
 """
 __config__ = {"mod": {"vnpy": {
-    "gateways: {
+    "gateways": {
         "FUTURE": {
             "name": "CTP",
             "app": "vnpy.gateway.ctp:CtpGateway",

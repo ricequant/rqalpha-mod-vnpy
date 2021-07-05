@@ -16,6 +16,9 @@
 #         详细的授权流程，请联系 public@ricequant.com 获取。
 
 from typing import Union
+import logging
+
+import logbook
 
 from vnpy.trader.constant import (
     Exchange as VNExchange, Direction as VNDirection, Offset as VNOffset, OrderType as VNOrderType
@@ -49,3 +52,11 @@ ORDER_TYPE_MAP = {
     ORDER_TYPE.LIMIT: VNOrderType.LIMIT
 }
 
+LOG_LEVEL_MAP = {
+    logging.NOTSET: logbook.NOTSET,
+    logging.DEBUG: logbook.DEBUG,
+    logging.INFO: logbook.INFO,
+    logging.WARN: logbook.WARNING,
+    logging.ERROR: logbook.ERROR,
+    logging.CRITICAL: logbook.CRITICAL,
+}
