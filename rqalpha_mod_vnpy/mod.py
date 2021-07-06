@@ -48,7 +48,7 @@ class VNPYMod(AbstractMod):
             system_log.info("未设置 gateways，rqalpha-mod-vnpy 关闭")
             return
         if env.config.base.run_type != RUN_TYPE.LIVE_TRADING:
-            system_log.info("未以实盘模式运行，rqalpha-mod-vnpy 关闭")
+            system_log.info(f"run in {env.config.base.run_type}，vnpy mod disabled")
             return
 
         if mod_config.full_day_mode:
