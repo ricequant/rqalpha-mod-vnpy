@@ -15,6 +15,7 @@
 #         在此前提下，对本软件的使用同样需要遵守 Apache 2.0 许可，Apache 2.0 许可与本许可冲突之处，以本许可为准。
 #         详细的授权流程，请联系 public@ricequant.com 获取。
 
+import pytz
 from functools import lru_cache
 from datetime import datetime, date, time
 from queue import Queue, Empty
@@ -104,7 +105,7 @@ class EventSource(AbstractEventSource):
             env: Environment,
             rqa_event_queue: Queue,
             vn_event_engine: VNEventEngine,
-            vn_gateways: Dict[ACCOUNT_TYPE, VNBaseGateway]
+            vn_gateways: Dict[ACCOUNT_TYPE, VNBaseGateway],
     ):
         self._env = env
         self._queue = rqa_event_queue
@@ -141,6 +142,7 @@ class EventSource(AbstractEventSource):
             need_night_trading = self._env.data_proxy.is_night_trading(self._env.get_universe())
             self._universe_changed = False
 
+        start_time = datetime.now()
         while True:
             _update_trading_periods_if_universe_changed()
             self._market_event_publisher.publish_if_need(need_night_trading)
@@ -155,13 +157,16 @@ class EventSource(AbstractEventSource):
                     break
                 if not events:
                     continue
-                for e in self._filter_events(events):
-                    if (e.event_type == EVENT.BAR and not is_trading(e.trading_dt, trading_periods)) or (
-                        e.event_type == EVENT.TICK and not is_trading(
-                            e.trading_dt, get_tick_trading_period(e.tick.order_book_id)
-                    )):
+            events = self._filter_events(events)
+            for e in events:
+                if e.event_type == EVENT.BAR and not is_trading(e.trading_dt, trading_periods):
+                    continue
+                if e.event_type == EVENT.TICK:
+                    trading_periods = get_tick_trading_period(e.tick.order_book_id)
+                    if not (is_trading(e.trading_dt, trading_periods) and e.calendar_dt >= start_time):
+                        # 有可能会收到旧的 tick
                         continue
-                    yield e
+                yield e
 
     def _on_universe_change(self, event):
         self._universe_changed = True
@@ -170,6 +175,7 @@ class EventSource(AbstractEventSource):
         if to_be_subscribed:
             for ins in self._env.data_proxy.instruments(list(to_be_subscribed)):
                 self._trading_code_map[ins.trading_code] = ins
+                # TODO: 推动 VNPY 加入批量订阅的接口
                 self._gateways[ins.account_type].subscribe(VNSubscribeRequest(
                     symbol=ins.trading_code,
                     exchange=EXCHANGE_MAP[ins.exchange]
@@ -211,10 +217,11 @@ class EventSource(AbstractEventSource):
                 "limit_down": vn_tick.limit_down,
             }
         )
+        dt = datetime.combine(tick.datetime.date(), tick.datetime.time())
         self._queue.put(Event(
             EVENT.TICK,
-            calendar_dt=tick.datetime,
-            trading_dt=self._env.data_proxy.get_trading_dt(tick.datetime),
+            calendar_dt=dt,
+            trading_dt=self._env.data_proxy.get_trading_dt(dt),
             tick=tick
         ))
 

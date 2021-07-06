@@ -39,6 +39,7 @@ __config__ = {"mod": {"vnpy": {
 
 __config__ = {
     "gateways": {},
+    "full_day_mode": False
 }
 
 

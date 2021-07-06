@@ -159,7 +159,8 @@ class Broker(AbstractBroker):
         self._env.event_bus.publish_event(Event(
             EVENT.TRADE,
             account=self._env.portfolio.get_account(order.order_book_id),
-            trade=trade
+            trade=trade,
+            order=order
         ))
         self._pop_if_order_is_final(order)
 

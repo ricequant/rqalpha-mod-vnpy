@@ -15,6 +15,7 @@
 #         在此前提下，对本软件的使用同样需要遵守 Apache 2.0 许可，Apache 2.0 许可与本许可冲突之处，以本许可为准。
 #         详细的授权流程，请联系 public@ricequant.com 获取。
 
+from time import sleep
 from queue import Queue
 from importlib import import_module
 from typing import Optional, Dict
@@ -32,9 +33,9 @@ from rqalpha.interface import AbstractMod
 from .event_source import EventSource
 from .broker import Broker
 from .consts import ACCOUNT_TYPE, LOG_LEVEL_MAP
+from .utils import get_mac_address, get_ip_address
 
 
-# TODO: 等待 VN.PY gateway 真正 ready 后再执行策略逻辑，这里需要 VN.PY gateway 给出连接状态
 class VNPYMod(AbstractMod):
     def __init__(self):
         self._vn_gateways: Dict[ACCOUNT_TYPE, VNBaseGateway] = {}
@@ -50,6 +51,11 @@ class VNPYMod(AbstractMod):
             system_log.info("未以实盘模式运行，rqalpha-mod-vnpy 关闭")
             return
 
+        if mod_config.full_day_mode:
+            system_log.warn("全天交易模式启动，改模式仅用于调试，请勿在生产环境开启!!!")
+            from . import event_source
+            event_source.is_trading = lambda dt, tp: True
+
         self._vn_event_engine = VNEventEngine()
         self._vn_event_engine.register(VN_EVENT_LOG, lambda e: system_log.log(
             LOG_LEVEL_MAP[e.data.level], f"[VN.PY]{e.data.msg}"
@@ -64,6 +70,14 @@ class VNPYMod(AbstractMod):
             self._vn_gateways[account_type] = gateway_cls(self._vn_event_engine, gateway_config.get("name", cls_name))
             self._vn_gateway_settings[account_type] = gateway_config["settings"]
 
+        self._vn_event_engine.start()
+        self._vn_event_engine_started = True
+        for account_type, vn_gateway in self._vn_gateways.items():
+            system_log.debug(f"VN.PY gateway {vn_gateway.gateway_name} connecting..")
+            vn_gateway.connect(self._vn_gateway_settings[account_type])
+
+        # TODO: 等待 VN.PY gateway 真正 ready 后再执行策略逻辑，这里需要 VN.PY gateway 给出连接状态
+        sleep(5)
         rqa_event_queue = Queue()
         env.set_broker(Broker(env, rqa_event_queue, self._vn_event_engine, self._vn_gateways))
         env.set_event_source(EventSource(env, rqa_event_queue, self._vn_event_engine, self._vn_gateways))
@@ -77,8 +91,5 @@ class VNPYMod(AbstractMod):
             self._vn_event_engine.stop()
 
     def _post_system_init(self, _):
-        self._vn_event_engine.start()
-        self._vn_event_engine_started = True
-        for account_type, vn_gateway in self._vn_gateways.items():
-            system_log.debug(f"VN.PY gateway {vn_gateway.gateway_name} connecting..")
-            vn_gateway.connect(self._vn_gateway_settings[account_type])
+        system_log.info(f"IP address: {get_ip_address()}")
+        system_log.info(f"MAC address: {get_mac_address()}")
